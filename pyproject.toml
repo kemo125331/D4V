@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "d4v"
+version = "0.1.0"
+description = "Diablo IV combat overlay research prototype"
+readme = "docs/README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "mss>=10.1.0",
+    "pillow>=11.3.0",
+]
+
+[project.scripts]
+d4v = "d4v.app:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/d4v"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,0 +1,9 @@
+.venv/
+.pytest_cache/
+__pycache__/
+*.pyc
+
+fixtures/replays/
+fixtures/debug-live-screen.png
+
+*.log
