@@ -4,6 +4,18 @@ D4V is an experimental Diablo IV combat tracker built around screen capture and 
 
 The goal is to detect floating combat text on screen, turn values like `246k` or `10.3M` into real numbers, and show useful live stats in a lightweight overlay or companion window.
 
+## Why This Exists
+
+Diablo IV does not expose a simple built-in combat meter for the kind of session tracking this project is aiming for. D4V explores a non-invasive path: read what the player already sees on screen and build useful combat stats from that.
+
+This repository is focused on the technical prototype for that workflow:
+
+- capture the game view
+- isolate floating combat text
+- OCR and normalize damage numbers
+- deduplicate repeated readings across nearby frames
+- aggregate those readings into totals, hit counts, and DPS
+
 ## What It Does Today
 
 - records replay sessions for analysis
@@ -18,7 +30,32 @@ The goal is to detect floating combat text on screen, turn values like `246k` or
 
 This project is in prototype stage.
 
-Replay analysis is the strongest part right now. Live detection is improving, but it still needs better game-window targeting before it can be trusted as a real combat meter.
+Replay analysis is the strongest part right now.
+
+What is working well:
+
+- replay capture and offline analysis
+- OCR parsing for `K`, `M`, and `B` suffixes
+- confidence filtering and frame-neighbor dedupe
+- replay summary generation with total damage, hit count, biggest hit, and DPS buckets
+
+What still needs work:
+
+- reliable live game-window targeting
+- better live hit recall for very short-lived floating numbers
+- a real transparent overlay pinned to Diablo IV instead of the current preview window
+
+## Next Milestone
+
+The next important milestone is a trustworthy live prototype.
+
+That means:
+
+1. target the actual Diablo IV window or monitor during live capture
+2. improve live recall enough to catch most hits in a controlled dummy test
+3. promote the current preview panel into a proper overlay shell
+
+Until that lands, replay mode is the best way to evaluate the pipeline.
 
 ## Project Structure
 
@@ -50,6 +87,12 @@ Live preview:
 uv run d4v live-preview --live
 ```
 
+Replay analysis:
+
+```powershell
+uv run d4v analyze-replay-ocr fixtures/replays/second-round
+```
+
 ## Design Principles
 
 - no memory reading or game injection
@@ -57,12 +100,26 @@ uv run d4v live-preview --live
 - clear iteration from offline analysis to live tracking
 - accuracy before overlay polish
 
+## Screenshots
+
+Repository screenshots are not committed yet because the current local captures include active game and desktop content that should be cleaned up before publishing.
+
+Once the live overlay path is more stable, this section should include:
+
+- a clean replay preview screenshot
+- a live preview screenshot
+- a small pipeline artifact example showing OCR-ready grouped combat text
+
 ## Roadmap
 
 - improve Diablo IV window detection for live capture
 - raise live hit recall and reduce missed short-lived numbers
 - add a real transparent overlay pinned to the game window
 - expand from damage stats into kill tracking and encounter summaries
+
+## License
+
+This project is released under the MIT License. See [LICENSE](LICENSE).
 
 ## Notes
 
