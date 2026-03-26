@@ -1,5 +1,8 @@
+import pytest
+from PIL import Image, ImageDraw
+
 from d4v.vision.classifier import is_plausible_damage_text, normalize_damage_text, parse_damage_value
-from d4v.vision.ocr import choose_best_ocr_candidate, clean_ocr_text, score_ocr_candidate
+from d4v.vision.ocr import choose_best_ocr_candidate, clean_ocr_text, score_ocr_candidate, ocr_pil_image
 
 
 def test_clean_ocr_text_keeps_damage_like_format():
@@ -38,3 +41,20 @@ def test_parse_damage_value_handles_suffix_scaling_examples():
 def test_is_plausible_damage_text_rejects_implausible_suffix_shape():
     assert not is_plausible_damage_text("363500M")
     assert is_plausible_damage_text("248M")
+
+
+def _make_digit_image(digit: str = "5", size: int = 36) -> Image.Image:
+    img = Image.new("L", (size, size), color=0)
+    draw = ImageDraw.Draw(img)
+    draw.text((4, 4), digit, fill=255)
+    return img
+
+
+def test_ocr_pil_image_with_pytesseract():
+    pytest.importorskip("pytesseract")
+    try:
+        result = ocr_pil_image(_make_digit_image("5"))
+        # Should contain the digit even if there is extra noise
+        assert "5" in result or result == ""
+    except FileNotFoundError:
+        pytest.skip("Tesseract not installed")

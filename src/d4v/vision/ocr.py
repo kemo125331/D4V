@@ -1,49 +1,41 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import re
-import subprocess
-import tempfile
 
-from PIL import Image, ImageFilter
+import cv2
+import numpy as np
+import pytesseract
+from PIL import Image
 
 from d4v.vision.classifier import parse_damage_value
 
 
-DEFAULT_TESSERACT_PATHS = (
-    Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe"),
-    Path(r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe"),
-)
-
 _OCR_NOISE_RE = re.compile(r"[^0-9kKmMbB,.\-]")
 
 
-def resolve_tesseract_path() -> Path:
+def _configure_tesseract() -> None:
+    """Apply TESSERACT_CMD env-var if set (pytesseract honours it natively)."""
     env_path = os.environ.get("TESSERACT_CMD")
     if env_path:
-        path = Path(env_path)
-        if path.exists():
-            return path
+        pytesseract.pytesseract.tesseract_cmd = env_path
 
-    for path in DEFAULT_TESSERACT_PATHS:
-        if path.exists():
-            return path
 
-    raise FileNotFoundError("Tesseract executable not found. Set TESSERACT_CMD if needed.")
+_configure_tesseract()
+
+
+# ---------------------------------------------------------------------------
+# Public API — signatures unchanged from the subprocess-based version
+# ---------------------------------------------------------------------------
 
 
 def ocr_image(
-    image_path: Path,
+    image_path: "os.PathLike[str] | str",
     psm_modes: tuple[int, ...] = (8, 7, 13),
     whitelist: str = "0123456789.,kKmMbB",
 ) -> str:
-    prepared_image_path = prepare_image_for_ocr(image_path)
-    return _ocr_prepared_image(
-        prepared_image_path,
-        psm_modes=psm_modes,
-        whitelist=whitelist,
-    )
+    with Image.open(image_path) as image:
+        return ocr_pil_image(image, psm_modes=psm_modes, whitelist=whitelist)
 
 
 def ocr_pil_image(
@@ -51,69 +43,52 @@ def ocr_pil_image(
     psm_modes: tuple[int, ...] = (8, 7, 13),
     whitelist: str = "0123456789.,kKmMbB",
 ) -> str:
-    prepared_image_path = prepare_image_object_for_ocr(image)
-    return _ocr_prepared_image(
-        prepared_image_path,
-        psm_modes=psm_modes,
-        whitelist=whitelist,
-    )
+    prepared = prepare_image_object_for_ocr(image)
+    candidates: list[str] = []
+    for psm in psm_modes:
+        config = f"--psm {psm} --oem 3 -c tessedit_char_whitelist={whitelist}"
+        try:
+            raw = pytesseract.image_to_string(prepared, config=config)
+            candidates.append(clean_ocr_text(raw))
+        except pytesseract.TesseractNotFoundError as exc:
+            raise FileNotFoundError(
+                "Tesseract executable not found. Install Tesseract and set "
+                "the TESSERACT_CMD env-var if needed."
+            ) from exc
+        except Exception:
+            continue
+
+    return choose_best_ocr_candidate(candidates)
 
 
-def _ocr_prepared_image(
-    prepared_image_path: Path,
-    psm_modes: tuple[int, ...],
-    whitelist: str,
-) -> str:
-    tesseract_path = resolve_tesseract_path()
-    try:
-        candidates: list[str] = []
-        for psm in psm_modes:
-            command = [
-                str(tesseract_path),
-                str(prepared_image_path),
-                "stdout",
-                "--psm",
-                str(psm),
-                "-l",
-                "eng",
-                "-c",
-                f"tessedit_char_whitelist={whitelist}",
-            ]
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                check=False,
-                timeout=15,
-            )
-            if result.returncode != 0:
-                continue
-            candidates.append(clean_ocr_text(result.stdout))
-
-        return choose_best_ocr_candidate(candidates)
-    finally:
-        if prepared_image_path.exists():
-            prepared_image_path.unlink()
+# ---------------------------------------------------------------------------
+# Image preparation (OpenCV-based, replaces PIL pipeline)
+# ---------------------------------------------------------------------------
 
 
-def prepare_image_for_ocr(image_path: Path) -> Path:
-    with Image.open(image_path) as image:
-        return prepare_image_object_for_ocr(image)
+def prepare_image_object_for_ocr(image: Image.Image) -> Image.Image:
+    """
+    Upscale, dilate, and binarise a grayscale mask image for Tesseract.
+
+    Steps:
+      1. Convert to grayscale numpy array.
+      2. Upscale 6× with NEAREST (preserve hard digit edges).
+      3. Dilate with a 3×3 kernel (equivalent to PIL MaxFilter(3)).
+      4. Binary threshold — any non-zero pixel → 255.
+      5. Convert back to PIL "L".
+    """
+    gray = np.array(image.convert("L"))
+    h, w = gray.shape
+    upscaled = cv2.resize(gray, (w * 6, h * 6), interpolation=cv2.INTER_NEAREST)
+    kernel = np.ones((3, 3), np.uint8)
+    dilated = cv2.dilate(upscaled, kernel, iterations=1)
+    _, binary = cv2.threshold(dilated, 0, 255, cv2.THRESH_BINARY)
+    return Image.fromarray(binary, mode="L")
 
 
-def prepare_image_object_for_ocr(image: Image.Image) -> Path:
-    prepared = image.convert("L")
-    prepared = prepared.resize(
-        (prepared.width * 6, prepared.height * 6),
-        Image.Resampling.NEAREST,
-    )
-    prepared = prepared.filter(ImageFilter.MaxFilter(3))
-    prepared = prepared.point(lambda value: 255 if value > 0 else 0, mode="1").convert("L")
-
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as handle:
-        temp_path = Path(handle.name)
-    prepared.save(temp_path)
-    return temp_path
+# ---------------------------------------------------------------------------
+# Text post-processing helpers (unchanged logic)
+# ---------------------------------------------------------------------------
 
 
 def clean_ocr_text(text: str) -> str:
@@ -129,13 +104,11 @@ def clean_ocr_text(text: str) -> str:
 def choose_best_ocr_candidate(candidates: list[str]) -> str:
     best = ""
     best_score = float("-inf")
-
     for candidate in candidates:
         score = score_ocr_candidate(candidate)
         if score > best_score:
             best = candidate
             best_score = score
-
     return best
 
 

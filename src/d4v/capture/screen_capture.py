@@ -1,7 +1,7 @@
 from PIL import Image
 import mss
 
-from d4v.capture.game_window import get_diablo_iv_bounds
+from d4v.capture.game_window import get_diablo_iv_bounds, is_diablo_iv_foreground
 
 
 def normalize_roi(
@@ -25,7 +25,10 @@ def capture_primary_monitor_image() -> Image.Image:
         return Image.frombytes("RGB", shot.size, shot.rgb)
 
 
-def capture_game_window_image() -> Image.Image | None:
+def capture_game_window_image(require_foreground: bool = False) -> Image.Image | None:
+    if require_foreground and not is_diablo_iv_foreground():
+        return None
+
     bounds = get_diablo_iv_bounds()
     if bounds is None:
         return None

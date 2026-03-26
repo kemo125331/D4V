@@ -19,10 +19,11 @@ This repository is focused on the technical prototype for that workflow:
 ## What It Does Today
 
 - records replay sessions for analysis
-- isolates likely damage text from Diablo IV frames
-- groups and OCRs floating damage numbers
+- isolates likely damage text using an OpenCV-powered HSV pipeline
+- groups and OCRs floating damage numbers via native pytesseract bindings
 - parses `K`, `M`, and `B` suffixes into real values
-- deduplicates repeated reads across nearby frames
+- deduplicates repeated readings across nearby frames
+- window focus tracking: pauses live capture when Diablo IV is not in focus
 - builds replay summaries with total damage, hit count, biggest hit, and a simple DPS timeline
 - includes a live preview prototype for real-time testing
 
@@ -35,13 +36,14 @@ Replay analysis is the strongest part right now.
 What is working well:
 
 - replay capture and offline analysis
-- OCR parsing for `K`, `M`, and `B` suffixes
+- fast OpenCV-based masking and connected components
+- native pytesseract OCR with fallback PSM modes
 - confidence filtering and frame-neighbor dedupe
+- automatic pausing when Diablo IV is not the foreground window
 - replay summary generation with total damage, hit count, biggest hit, and DPS buckets
 
 What still needs work:
 
-- reliable live game-window targeting
 - better live hit recall for very short-lived floating numbers
 - a real transparent overlay pinned to Diablo IV instead of the current preview window
 
@@ -51,9 +53,9 @@ The next important milestone is a trustworthy live prototype.
 
 That means:
 
-1. target the actual Diablo IV window or monitor during live capture
-2. improve live recall enough to catch most hits in a controlled dummy test
-3. promote the current preview panel into a proper overlay shell
+1. improve live recall enough to catch most hits in a controlled dummy test
+2. promote the current preview panel into a proper overlay shell
+3. expand vision to include gold/XP counters using the validated OCR pipeline
 
 Until that lands, replay mode is the best way to evaluate the pipeline.
 
@@ -66,10 +68,10 @@ Until that lands, replay mode is the best way to evaluate the pipeline.
 - `src/d4v/overlay`: lightweight preview UI
 - `docs`: research, plans, and testing notes
 
-## Quick Start
-
 Create the environment and run tests:
 
+1. **Install Tesseract OCR**: This project requires the Tesseract OCR engine installed on your system.
+2. **Install Dependencies**:
 ```powershell
 uv sync
 uv run pytest -q

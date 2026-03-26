@@ -11,6 +11,7 @@ from PIL import Image, ImageOps
 
 from d4v.capture.screen_capture import capture_game_window_image
 from d4v.capture.recorder import CaptureSessionConfig, FrameRecorder
+from d4v.capture.game_window import is_diablo_iv_foreground
 from d4v.domain.models import StableDamageHit
 from d4v.domain.session_stats import SessionStats
 from d4v.overlay.view_model import PreviewViewModel
@@ -340,6 +341,7 @@ class LivePreviewController:
         image_processor: Callable[[Image.Image, int, int], list[LiveDetectedHit]] | None = None,
         recorder: FrameRecorder | None = None,
         background_refresh: bool = True,
+        require_foreground: bool = True,
     ) -> None:
         self.replay_dir = replay_dir
         self.session_name = session_name or f"live-preview-{time.strftime('%Y%m%d-%H%M%S')}"
@@ -347,12 +349,14 @@ class LivePreviewController:
         self.refresh_interval_ms = refresh_interval_ms
         self.summary_analyzer = analyzer
         self.frame_processor = frame_processor
+        self._using_default_grabber = screen_grabber is None
         self.screen_grabber = screen_grabber or capture_game_window_image
         self.image_processor = image_processor or (
             lambda img, idx, ts: detect_hits_in_image(img, idx, ts, max_line_candidates=16)
         )
         self.recorder = recorder or FrameRecorder(replay_dir)
         self.background_refresh = background_refresh
+        self.require_foreground = require_foreground
         self.stats = SessionStats()
         self.last_hit: int | None = None
         self.status = "Ready"
@@ -578,6 +582,10 @@ class LivePreviewController:
         return new_hits
 
     def _process_live_capture(self) -> list[LiveDetectedHit]:
+        if self.require_foreground and self._using_default_grabber and not is_diablo_iv_foreground():
+            self.status = "Game not in focus — paused"
+            return []
+
         image = self.screen_grabber()
         if image is None:
             # If the game window isn't found, just return an empty hit list

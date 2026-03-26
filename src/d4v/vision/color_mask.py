@@ -1,27 +1,32 @@
+from __future__ import annotations
+
+import cv2
+import numpy as np
 from PIL import Image
 
 
 def count_combat_text_pixels(image: Image.Image) -> int:
-    histogram = build_combat_text_mask(image).histogram()
-    return histogram[255]
+    return int(np.count_nonzero(np.array(build_combat_text_mask(image))))
 
 
 def build_combat_text_mask(image: Image.Image) -> Image.Image:
+    """
+    Return a binary PIL "L" mask where combat-text pixels are 255.
+
+    Colour ranges (in HSV):
+      - Yellow/orange damage numbers  hue  10–30, S ≥ 120, V ≥ 140
+      - White text                    S ≤ 40,      V ≥ 190
+      - Blue text (freeze/cold)       hue  90–130, S ≥ 100, V ≥ 140
+    """
     rgb = image.convert("RGB")
-    mask = Image.new("L", rgb.size, color=0)
-    width, height = rgb.size
-    rgb_pixels = rgb.load()
-    mask_pixels = mask.load()
+    bgr = cv2.cvtColor(np.array(rgb), cv2.COLOR_RGB2BGR)
+    hsv = cv2.cvtColor(bgr, cv2.COLOR_BGR2HSV)
 
-    for y in range(height):
-        for x in range(width):
-            r, g, b = rgb_pixels[x, y]
-            
-            is_white = r >= 190 and g >= 190 and b >= 190
-            is_yellow_or_orange = r >= 160 and g >= 100 and b <= 140 and r >= g
-            is_blue = r <= 150 and g >= 160 and b >= 180
-            
-            if is_white or is_yellow_or_orange or is_blue:
-                mask_pixels[x, y] = 255
+    yellow_orange = cv2.inRange(hsv, (10, 120, 140), (30, 255, 255))
+    white = cv2.inRange(hsv, (0, 0, 190), (180, 40, 255))
+    blue = cv2.inRange(hsv, (90, 100, 140), (130, 255, 255))
 
-    return mask
+    combined = cv2.bitwise_or(yellow_orange, white)
+    combined = cv2.bitwise_or(combined, blue)
+
+    return Image.fromarray(combined, mode="L")

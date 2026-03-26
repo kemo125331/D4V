@@ -41,3 +41,12 @@ def get_diablo_iv_bounds() -> GameWindowBounds | None:
         width=width,
         height=height,
     )
+
+
+def is_diablo_iv_foreground() -> bool:
+    """Return True when the Diablo IV window is the active foreground window."""
+    hwnd = ctypes.windll.user32.FindWindowW(None, "Diablo IV")
+    if not hwnd:
+        return False
+    foreground_hwnd = ctypes.windll.user32.GetForegroundWindow()
+    return bool(hwnd == foreground_hwnd)

@@ -1,5 +1,9 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 
+import cv2
+import numpy as np
 from PIL import Image
 
 
@@ -26,59 +30,38 @@ def find_connected_components(
     min_width: int = 4,
     min_height: int = 6,
 ) -> list[BoundingBox]:
-    binary = mask.convert("L")
-    width, height = binary.size
-    pixels = binary.load()
-    visited = bytearray(width * height)
+    """
+    Find connected blobs in a binary PIL mask using cv2.connectedComponentsWithStats.
+
+    Returns the same list[BoundingBox] contract as the previous BFS implementation.
+    """
+    binary = np.array(mask.convert("L"))
+    # OpenCV CCA requires uint8 binary image (0 or 255).
+    _, thresh = cv2.threshold(binary, 0, 255, cv2.THRESH_BINARY)
+
+    num_labels, _, stats, _ = cv2.connectedComponentsWithStats(thresh, connectivity=4)
+
     components: list[BoundingBox] = []
+    # Label 0 is the background; start from 1.
+    for label in range(1, num_labels):
+        x = int(stats[label, cv2.CC_STAT_LEFT])
+        y = int(stats[label, cv2.CC_STAT_TOP])
+        w = int(stats[label, cv2.CC_STAT_WIDTH])
+        h = int(stats[label, cv2.CC_STAT_HEIGHT])
+        area = int(stats[label, cv2.CC_STAT_AREA])
 
-    def idx(x: int, y: int) -> int:
-        return (y * width) + x
+        if area < min_pixels or w < min_width or h < min_height:
+            continue
 
-    for y in range(height):
-        for x in range(width):
-            flat_index = idx(x, y)
-            if visited[flat_index] or pixels[x, y] == 0:
-                continue
-
-            stack = [(x, y)]
-            visited[flat_index] = 1
-            left = right = x
-            top = bottom = y
-            pixel_count = 0
-
-            while stack:
-                current_x, current_y = stack.pop()
-                pixel_count += 1
-                left = min(left, current_x)
-                right = max(right, current_x)
-                top = min(top, current_y)
-                bottom = max(bottom, current_y)
-
-                for next_x, next_y in (
-                    (current_x - 1, current_y),
-                    (current_x + 1, current_y),
-                    (current_x, current_y - 1),
-                    (current_x, current_y + 1),
-                ):
-                    if next_x < 0 or next_y < 0 or next_x >= width or next_y >= height:
-                        continue
-                    next_index = idx(next_x, next_y)
-                    if visited[next_index] or pixels[next_x, next_y] == 0:
-                        continue
-                    visited[next_index] = 1
-                    stack.append((next_x, next_y))
-
-            box = BoundingBox(
-                left=left,
-                top=top,
-                right=right,
-                bottom=bottom,
-                pixel_count=pixel_count,
+        components.append(
+            BoundingBox(
+                left=x,
+                top=y,
+                right=x + w - 1,
+                bottom=y + h - 1,
+                pixel_count=area,
             )
-            if box.pixel_count < min_pixels or box.width < min_width or box.height < min_height:
-                continue
-            components.append(box)
+        )
 
     return sorted(components, key=lambda box: (box.top, box.left))
 
@@ -119,6 +102,7 @@ def split_component_by_vertical_gaps(
     min_width: int,
     min_height: int,
 ) -> list[BoundingBox]:
+    """Column-scan split on sub-region — kept as pure Python (runs on small crops)."""
     binary = mask.convert("L")
     pixels = binary.load()
     column_counts: list[int] = []

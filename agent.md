@@ -21,12 +21,15 @@ Do not jump straight into implementation choices that assume perfect combat tele
 Reference projects:
 - Diablo4Companion: https://github.com/josdemmers/Diablo4Companion
 - d4lf: https://github.com/d4lfteam/d4lf
+- Diablo-4-XP-and-gold-per-hour (akjroller): https://github.com/akjroller/Diablo-4-XP-and-gold-per-hour
+- Aion 2 OCR DPS Meter / PoE 2 OCR Concepts: Proof points that Python+OCR DPS meters are being explored for other modern ARPGs.
 
 Important takeaways:
 - Mature Diablo IV tools are out-of-process overlays, not in-game mods.
 - They rely on screen capture, OCR, template matching, resolution presets, and window tracking.
 - `d4lf` goes further by using Diablo IV accessibility/TTS plumbing for item text, but that does not give us a clean combat-event API.
-- Neither reference project provides a ready-made live damage meter or kill counter pipeline.
+- `Diablo-4-XP-and-gold-per-hour` proves that Python + Tesseract can successfully parse rapidly updating Diablo 4 UI text (resources), though damage numbers are harder.
+- Neither reference project provides a ready-made live damage meter or kill counter pipeline, but other ARPG communities (like Aion 2 and PoE 2) are actively experimenting with Python OCR DPS trackers.
 
 ## Hard Constraints
 

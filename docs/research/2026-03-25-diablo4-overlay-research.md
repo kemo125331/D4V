@@ -7,6 +7,8 @@ Date: 2026-03-25
 Research whether we can build a Diablo IV overlay that tracks damage and kills, using the following projects as inspiration:
 - Diablo4Companion
 - d4lf
+- Diablo-4-XP-and-gold-per-hour (akjroller)
+- AION 2 OCR / PoE 2 OCR community concepts
 
 ## Executive Summary
 
@@ -64,6 +66,27 @@ Why it matters to us:
 - Strong proof that Python is fast enough for an MVP overlay/capture stack.
 - Strong proof that out-of-process screen analysis is a practical approach for Diablo IV tooling.
 - Not a reusable combat meter implementation.
+
+### 3. Diablo-4-XP-and-gold-per-hour
+
+Repo:
+- https://github.com/akjroller/Diablo-4-XP-and-gold-per-hour
+
+What it is:
+- A Python script utilizing Tesseract OCR to read Diablo 4 UI elements and calculate gold/XP per hour.
+
+Why it matters to us:
+- Direct proof that Python + Tesseract OCR can reliably parse changing on-screen numbers in Diablo 4.
+- Combat numbers are harder (floating, transient, stylized fonts) than static UI resource text, but the basic capture-to-OCR pipeline is validated.
+
+### 4. Other ARPG OCR DPS Trackers
+
+Concepts:
+- Aion 2 OCR DPS Meter Python implementations and Path of Exile 2 OCR PoCs discussed on Reddit.
+
+Why it matters to us:
+- Validates the thesis: players in modern ARPGs lacking official API support are successfully turning to Python+OCR for live damage tracking.
+- We aren't building a fundamentally impossible architecture; we are just applying it to Diablo 4's specific visual language.
 
 ## What We Can Reuse
 
@@ -185,7 +208,39 @@ Mitigation:
 
 - Diablo4Companion repo: https://github.com/josdemmers/Diablo4Companion
 - d4lf repo: https://github.com/d4lfteam/d4lf
+- Diablo-4-XP-and-gold-per-hour: https://github.com/akjroller/Diablo-4-XP-and-gold-per-hour
 - Blizzard EULA: https://www.blizzard.com/en-us/legal/08b946df-660a-40e4-a072-1fbde65173b1/blizzard-end-user-license-agreement
+
+## Implemented Improvements (2026-03-26)
+
+### Improvement 1 — Native Tesseract via pytesseract
+
+Dropped the `subprocess`-per-frame Tesseract call pattern.
+All OCR now uses `pytesseract.image_to_string` with PSM 8 / 7 / 13 fallback,
+running in-process. This removes per-call process-spawn overhead and
+enables future use of Tesseract's structured confidence output.
+
+### Improvement 2 — OpenCV Image Pipeline
+
+`color_mask.py`: Replaced the Python per-pixel loop with `cv2.inRange` on an HSV
+frame. Vectorised, runs on the GPU if OpenCL is available, and uses more
+physically accurate HSV colour ranges for yellow/orange, white, and blue text.
+
+`segments.py`: Replaced the BFS connected-component search with
+`cv2.connectedComponentsWithStats` (4-connectivity). Produces the same
+`list[BoundingBox]` output contract but is significantly faster on
+large-resolution captures.
+
+`ocr.py`: Image preparation (upscale, dilate, threshold) rewritten with
+`cv2.resize`, `cv2.dilate`, and `cv2.threshold` — replacing the PIL `MaxFilter`
+and point-map chain.
+
+### Improvement 4 — Window Focus / Foreground Tracking
+
+Added `is_diablo_iv_foreground()` in `game_window.py` using `GetForegroundWindow`
+ctypes. The live preview controller uses this to pause capture and show a
+`"Game not in focus — paused"` status when the user alt-tabs, preventing
+false positives from desktop UI noise.
 
 ## Final Recommendation
 
