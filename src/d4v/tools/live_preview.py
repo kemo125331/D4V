@@ -676,8 +676,11 @@ def main_live_with_overlay() -> int:
     # Create preview window first (this will be the main window)
     preview_app = PreviewWindow(live_controller)
     
-    # Create overlay window with the proxy controller
-    overlay_app = GameOverlayWindow(overlay_controller, auto_start=False, debug=False)
+    # Create overlay window with the proxy controller (use Toplevel to avoid Tk conflict)
+    overlay_app = GameOverlayWindow(overlay_controller, auto_start=False, debug=False, use_toplevel=True)
+    
+    # Make sure overlay window is visible
+    overlay_app.root.deiconify()
     
     # Initial render
     vm = overlay_controller.view_model()
@@ -700,18 +703,21 @@ def main_live_with_overlay() -> int:
         overlay_view_model = overlay_controller.view_model()
         
         # Debug: check what we're trying to display
-        if _update_count[0] <= 5 or (live_controller.stats.hit_count > 0 and _update_count[0] <= 20):
+        if _update_count[0] <= 10 or (live_controller.stats.hit_count > 0 and _update_count[0] <= 30):
             print(f"[Tick {_update_count[0]}] Hits={live_controller.stats.hit_count}, Total={live_controller.stats.visible_damage_total:,}, Last={live_controller.last_hit}")
             print(f"  -> View Model: AVG={overlay_view_model.avg_damage_label}, LAST={overlay_view_model.last_damage_label}, TOTAL={overlay_view_model.total_damage_label}")
+            print(f"  -> Status: {live_controller.status}")
         
         # Update overlay display
         overlay_app._apply_view_model(overlay_view_model)
         
         # Debug: verify tkinter variables were set
-        if _update_count[0] <= 5 or (live_controller.stats.hit_count > 0 and _update_count[0] <= 20):
+        if _update_count[0] <= 10 or (live_controller.stats.hit_count > 0 and _update_count[0] <= 30):
             print(f"  -> Tkinter vars: avg={overlay_app._avg_var.get()}, last={overlay_app._last_var.get()}, total={overlay_app._total_var.get()}")
         
-        overlay_app._update_position()
+        # Only update position if user hasn't moved the window
+        if not overlay_app._user_moved:
+            overlay_app._update_position()
         
         original_tick()
     

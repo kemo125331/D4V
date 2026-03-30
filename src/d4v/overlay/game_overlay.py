@@ -89,9 +89,17 @@ class GameOverlayWindow:
     - Shows damage stats with minimal visual footprint
     """
     
-    def __init__(self, controller: GameOverlayController, auto_start: bool = True, debug: bool = False) -> None:
+    def __init__(self, controller: GameOverlayController, auto_start: bool = True, debug: bool = False, use_toplevel: bool = False) -> None:
         self.controller = controller
-        self.root = tk.Tk()
+        self.use_toplevel = use_toplevel
+        self._user_moved = False  # Track if user has manually moved the window
+        
+        if use_toplevel:
+            # Use Toplevel when embedded with another Tk window
+            self.root = tk.Toplevel()
+        else:
+            # Use Tk() for standalone mode
+            self.root = tk.Tk()
         
         # Debug mode: visible window with border
         if debug:
@@ -99,7 +107,7 @@ class GameOverlayWindow:
             self.root.attributes("-topmost", True)
             self.root.configure(bg="red")
         else:
-            # Remove window decorations
+            # Remove window decorations but allow dragging
             self.root.overrideredirect(True)
             # Make background transparent - use a specific color that's not used elsewhere
             self.root.attributes("-transparentcolor", "#000001")
@@ -122,6 +130,9 @@ class GameOverlayWindow:
         self._job: str | None = None
         self._build_ui()
         self._update_position()
+        
+        # Enable window dragging
+        self._enable_drag()
 
         # Auto-start the overlay
         if auto_start:
@@ -243,11 +254,58 @@ class GameOverlayWindow:
             anchor="e",
         )
         value_label.pack(side=tk.LEFT)
+
+    def _enable_drag(self) -> None:
+        """Enable window dragging functionality."""
+        self._drag_data = {"x": 0, "y": 0, "active": False}
+        
+        # Bind mouse events to the main frame and all child widgets
+        widgets = [self.root]
+        for widget in self.root.winfo_children():
+            widgets.append(widget)
+            for child in widget.winfo_children():
+                widgets.append(child)
+        
+        for widget in widgets:
+            widget.bind("<ButtonPress-1>", self._on_drag_start)
+            widget.bind("<ButtonRelease-1>", self._on_drag_end)
+            widget.bind("<B1-Motion>", self._on_drag_motion)
     
+    def _on_drag_start(self, event: tk.Event) -> None:
+        """Handle drag start."""
+        self._drag_data["x"] = event.x
+        self._drag_data["y"] = event.y
+        self._drag_data["active"] = True
+    
+    def _on_drag_end(self, event: tk.Event) -> None:
+        """Handle drag end."""
+        self._drag_data["active"] = False
+        self._user_moved = True  # Mark that user has manually moved the window
+    
+    def _on_drag_motion(self, event: tk.Event) -> None:
+        """Handle drag motion."""
+        if not self._drag_data["active"]:
+            return
+        
+        # Calculate new position
+        delta_x = event.x - self._drag_data["x"]
+        delta_y = event.y - self._drag_data["y"]
+        
+        # Get current window position
+        x = self.root.winfo_x() + delta_x
+        y = self.root.winfo_y() + delta_y
+        
+        # Move window
+        self.root.geometry(f"+{x}+{y}")
+
     def _update_position(self) -> None:
         """Update window position to bottom-left of game window."""
+        # Don't auto-update position if user has manually dragged the window
+        if self._user_moved:
+            return
+            
         bounds = get_diablo_iv_bounds()
-        
+
         if bounds is None:
             # Fallback to screen bottom-left
             screen_width = self.root.winfo_screenwidth()
@@ -258,7 +316,7 @@ class GameOverlayWindow:
             # Position at bottom-left of game window
             x = bounds.left + 20
             y = bounds.top + bounds.height - 200
-        
+
         self.root.geometry(f"+{x}+{y}")
     
     def start(self) -> None:
