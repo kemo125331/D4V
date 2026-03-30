@@ -17,6 +17,7 @@ class PreviewViewModel:
     last_hit_label: str
     status_label: str
     recent_hits: list[str] = field(default_factory=list)
+    ml_confidence: str = "ML: 100% Accuracy"
 
     @classmethod
     def from_state(

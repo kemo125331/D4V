@@ -43,6 +43,10 @@ def ocr_pil_image(
     psm_modes: tuple[int, ...] = (8, 7, 13),
     whitelist: str = "0123456789.,kKmMbB",
 ) -> str:
+    """Run OCR on a PIL image with fallback PSM modes."""
+    # Configure Tesseract path on every call (handles env var changes)
+    _configure_tesseract()
+    
     prepared = prepare_image_object_for_ocr(image)
     candidates: list[str] = []
     for psm in psm_modes:

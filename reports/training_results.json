@@ -1,0 +1,51 @@
+{
+  "accuracy": 1.0,
+  "precision": 1.0,
+  "recall": 1.0,
+  "f1": 1.0,
+  "confusion_matrix": [
+    [
+      268,
+      0
+    ],
+    [
+      0,
+      49
+    ]
+  ],
+  "feature_names": [
+    "line_score",
+    "fill_ratio",
+    "aspect_ratio",
+    "member_count",
+    "width",
+    "height",
+    "has_digit",
+    "has_suffix",
+    "has_decimal",
+    "starts_with_nonzero",
+    "text_length",
+    "parsed_value",
+    "value_in_range",
+    "is_plausible"
+  ],
+  "feature_coefficients": [
+    0.1940423428757522,
+    0.1940423428757534,
+    -0.007518787863568521,
+    0.0,
+    0.09959778654969374,
+    -0.07602793511077684,
+    0.5237570568572872,
+    0.4286333815732041,
+    -0.15646176717860555,
+    0.6278745946705274,
+    0.3070485579724735,
+    0.1577933329841928,
+    0.9861651573184824,
+    3.03399183777227
+  ],
+  "intercept": -5.143910540852837,
+  "train_size": 1264,
+  "test_size": 317
+}

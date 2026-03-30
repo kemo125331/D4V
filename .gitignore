@@ -7,3 +7,4 @@ fixtures/replays/
 fixtures/debug-live-screen.png
 
 *.log
+/fixtures

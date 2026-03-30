@@ -4,16 +4,23 @@ import time
 
 from PIL import Image
 
-from d4v.vision.grouping import group_from_boxes
-from d4v.vision.segments import BoundingBox
+from d4v.vision.pipeline import DetectedHit
 from d4v.tools.live_preview import (
-    LiveDetectedHit,
     LivePreviewController,
     ReplayHit,
     ReplayPreviewController,
-    find_adjacent_suffix_hint,
-    is_plain_numeric_text,
 )
+
+
+class FakePipeline:
+    """Fake pipeline for testing that returns predefined hits."""
+    
+    def __init__(self, hits_by_frame: dict[int, list[DetectedHit]]) -> None:
+        self.hits_by_frame = hits_by_frame
+    
+    def process_image(self, image: Image.Image, frame_index: int, timestamp_ms: int) -> list[DetectedHit]:
+        del image, timestamp_ms
+        return self.hits_by_frame.get(frame_index, [])
 
 
 def test_replay_preview_controller_updates_totals_over_time():
@@ -114,7 +121,6 @@ def test_live_preview_controller_refreshes_from_analyzer(tmp_path):
         fps=10,
         refresh_interval_ms=500,
         analyzer=analyzer,
-        frame_processor=detect_hits_unused,
         recorder=recorder,
         background_refresh=False,
     )
@@ -149,7 +155,6 @@ def test_live_preview_controller_stop_refreshes_one_last_time(tmp_path):
         replay_dir=tmp_path,
         session_name="live-b",
         analyzer=analyzer,
-        frame_processor=detect_hits_unused,
         recorder=recorder,
         background_refresh=False,
     )
@@ -186,7 +191,6 @@ def test_live_preview_controller_background_refresh_does_not_block_tick(tmp_path
         session_name="live-c",
         refresh_interval_ms=500,
         analyzer=analyzer,
-        frame_processor=detect_hits_unused,
         recorder=recorder,
         background_refresh=True,
     )
@@ -208,7 +212,7 @@ def test_live_preview_controller_background_refresh_does_not_block_tick(tmp_path
     assert controller.stats.visible_damage_total == 1500
 
 
-def detect_hits_unused(_frame_path: Path, _fps: int) -> list[LiveDetectedHit]:
+def detect_hits_unused(_frame_path: Path, _fps: int) -> list[DetectedHit]:
     return []
 
 
@@ -217,59 +221,52 @@ def test_live_preview_controller_streams_new_frames_incrementally(tmp_path):
     session_dir.mkdir()
     recorder = FakeRecorder(session_dir)
 
-    images = [Image.new("RGB", (32, 32), "black"), Image.new("RGB", (32, 32), "black")]
-    image_index = {"value": 0}
+    pipeline = FakePipeline({
+        0: [
+            DetectedHit(
+                frame_index=0,
+                timestamp_ms=0,
+                parsed_value=1200,
+                confidence=1.0,
+                sample_text="1.2k",
+                center_x=100.0,
+                center_y=100.0,
+            )
+        ],
+        1: [
+            DetectedHit(
+                frame_index=1,
+                timestamp_ms=100,
+                parsed_value=1200,
+                confidence=1.0,
+                sample_text="1.2k",
+                center_x=102.0,
+                center_y=101.0,
+            ),
+            DetectedHit(
+                frame_index=1,
+                timestamp_ms=100,
+                parsed_value=3400,
+                confidence=1.0,
+                sample_text="3.4k",
+                center_x=200.0,
+                center_y=200.0,
+            ),
+        ],
+    })
 
     def screen_grabber() -> Image.Image:
-        current = min(image_index["value"], len(images) - 1)
-        image_index["value"] += 1
-        return images[current]
-
-    def image_processor(image: Image.Image, frame_index: int, timestamp_ms: int) -> list[LiveDetectedHit]:
-        del image, timestamp_ms
-        if frame_index == 0:
-            return [
-                LiveDetectedHit(
-                    frame_index=0,
-                    timestamp_ms=0,
-                    parsed_value=1200,
-                    confidence=1.0,
-                    sample_text="1.2k",
-                    center_x=100.0,
-                    center_y=100.0,
-                )
-            ]
-        if frame_index == 1:
-            return [
-                LiveDetectedHit(
-                    frame_index=1,
-                    timestamp_ms=100,
-                    parsed_value=1200,
-                    confidence=1.0,
-                    sample_text="1.2k",
-                    center_x=102.0,
-                    center_y=101.0,
-                ),
-                LiveDetectedHit(
-                    frame_index=1,
-                    timestamp_ms=100,
-                    parsed_value=3400,
-                    confidence=1.0,
-                    sample_text="3.4k",
-                    center_x=200.0,
-                    center_y=200.0,
-                ),
-            ]
-        return []
+        return Image.new("RGB", (32, 32), "black")
 
     controller = LivePreviewController(
         replay_dir=tmp_path,
         session_name="live-stream",
         fps=10,
+        pipeline=pipeline,
         screen_grabber=screen_grabber,
-        image_processor=image_processor,
         recorder=recorder,
         background_refresh=False,
+        require_foreground=False,
     )
 
     controller.start()
@@ -286,61 +283,54 @@ def test_live_preview_controller_allows_same_value_after_short_gap(tmp_path):
     session_dir.mkdir()
     recorder = FakeRecorder(session_dir)
 
-    image_index = {"value": 0}
+    pipeline = FakePipeline({
+        0: [
+            DetectedHit(
+                frame_index=0,
+                timestamp_ms=0,
+                parsed_value=1200,
+                confidence=1.0,
+                sample_text="1.2k",
+                center_x=100.0,
+                center_y=100.0,
+            )
+        ],
+        1: [
+            DetectedHit(
+                frame_index=1,
+                timestamp_ms=100,
+                parsed_value=1200,
+                confidence=1.0,
+                sample_text="1.2k",
+                center_x=102.0,
+                center_y=101.0,
+            )
+        ],
+        2: [
+            DetectedHit(
+                frame_index=2,
+                timestamp_ms=200,
+                parsed_value=1200,
+                confidence=1.0,
+                sample_text="1.2k",
+                center_x=101.0,
+                center_y=100.0,
+            )
+        ],
+    })
 
     def screen_grabber() -> Image.Image:
-        image = Image.new("RGB", (32, 32), "black")
-        image_index["value"] += 1
-        return image
-
-    def image_processor(image: Image.Image, frame_index: int, timestamp_ms: int) -> list[LiveDetectedHit]:
-        del image, timestamp_ms
-        if frame_index == 0:
-            return [
-                LiveDetectedHit(
-                    frame_index=0,
-                    timestamp_ms=0,
-                    parsed_value=1200,
-                    confidence=1.0,
-                    sample_text="1.2k",
-                    center_x=100.0,
-                    center_y=100.0,
-                )
-            ]
-        if frame_index == 1:
-            return [
-                LiveDetectedHit(
-                    frame_index=1,
-                    timestamp_ms=100,
-                    parsed_value=1200,
-                    confidence=1.0,
-                    sample_text="1.2k",
-                    center_x=102.0,
-                    center_y=101.0,
-                )
-            ]
-        if frame_index == 2:
-            return [
-                LiveDetectedHit(
-                    frame_index=2,
-                    timestamp_ms=200,
-                    parsed_value=1200,
-                    confidence=1.0,
-                    sample_text="1.2k",
-                    center_x=101.0,
-                    center_y=100.0,
-                )
-            ]
-        return []
+        return Image.new("RGB", (32, 32), "black")
 
     controller = LivePreviewController(
         replay_dir=tmp_path,
         session_name="live-gap",
         fps=10,
+        pipeline=pipeline,
         screen_grabber=screen_grabber,
-        image_processor=image_processor,
         recorder=recorder,
         background_refresh=False,
+        require_foreground=False,
     )
 
     controller.start()
@@ -356,32 +346,33 @@ def test_live_preview_controller_direct_capture_does_not_wait_for_saved_frames(t
     session_dir = tmp_path / "live-direct"
     recorder = FakeRecorder(session_dir)
 
-    def screen_grabber() -> Image.Image:
-        return Image.new("RGB", (32, 32), "black")
-
-    def image_processor(image: Image.Image, frame_index: int, timestamp_ms: int) -> list[LiveDetectedHit]:
-        del image
-        return [
-            LiveDetectedHit(
-                frame_index=frame_index,
-                timestamp_ms=timestamp_ms,
+    pipeline = FakePipeline({
+        0: [
+            DetectedHit(
+                frame_index=0,
+                timestamp_ms=0,
                 parsed_value=250000,
                 confidence=1.0,
                 sample_text="250k",
                 center_x=140.0,
                 center_y=120.0,
             )
-        ]
+        ],
+    })
+
+    def screen_grabber() -> Image.Image:
+        return Image.new("RGB", (32, 32), "black")
 
     controller = LivePreviewController(
         replay_dir=tmp_path,
         session_name="live-direct",
         fps=10,
         refresh_interval_ms=300,
+        pipeline=pipeline,
         screen_grabber=screen_grabber,
-        image_processor=image_processor,
         recorder=recorder,
         background_refresh=False,
+        require_foreground=False,
     )
 
     controller.start()
@@ -390,40 +381,3 @@ def test_live_preview_controller_direct_capture_does_not_wait_for_saved_frames(t
     assert controller.stats.visible_damage_total == 250000
     assert controller.stats.hit_count == 1
     assert controller.last_hit == 250000
-
-
-def test_is_plain_numeric_text_detects_missing_suffix_case():
-    assert is_plain_numeric_text("201")
-    assert not is_plain_numeric_text("201K")
-
-
-def test_find_adjacent_suffix_hint_picks_nearby_suffix_group():
-    number_group = group_from_boxes(
-        (
-            BoundingBox(left=100, top=100, right=140, bottom=124, pixel_count=120),
-            BoundingBox(left=142, top=100, right=160, bottom=124, pixel_count=80),
-        )
-    )
-    suffix_group = group_from_boxes(
-        (
-            BoundingBox(left=166, top=101, right=174, bottom=123, pixel_count=40),
-        )
-    )
-    far_group = group_from_boxes(
-        (
-            BoundingBox(left=220, top=100, right=228, bottom=123, pixel_count=40),
-        )
-    )
-
-    text_map = {
-        (suffix_group.left, suffix_group.top, suffix_group.right, suffix_group.bottom): "k",
-        (far_group.left, far_group.top, far_group.right, far_group.bottom): "m",
-    }
-
-    hint = find_adjacent_suffix_hint(
-        number_group,
-        [number_group, suffix_group, far_group],
-        lambda group: text_map.get((group.left, group.top, group.right, group.bottom), ""),
-    )
-
-    assert hint == "K"
