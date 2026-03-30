@@ -39,8 +39,8 @@ class GroupedCandidate:
 
 def group_bounding_boxes(
     boxes: list[BoundingBox],
-    max_group_width: int = 260,
-    max_group_height: int = 90,
+    max_group_width: int = 380,   # was 260 — handles large crits at 1440p+
+    max_group_height: int = 130,  # was 90
     max_group_members: int = 15,
 ) -> list[GroupedCandidate]:
     groups: list[GroupedCandidate] = []

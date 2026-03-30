@@ -6,7 +6,9 @@ from d4v.tools.analyze_replay_roi import main as analyze_replay_roi_main
 from d4v.tools.analyze_replay_tokens import main as analyze_replay_tokens_main
 from d4v.tools.capture_round import main as capture_round_main
 from d4v.tools.live_preview import main_live as live_preview_live_main
+from d4v.tools.live_preview import main_live_with_overlay
 from d4v.tools.live_preview import main_replay as live_preview_replay_main
+from d4v.overlay.game_overlay import main as game_overlay_main
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -35,6 +37,12 @@ def main(argv: list[str] | None = None) -> int:
     if args[0] == "live-preview" and len(args) == 2 and args[1] == "--live":
         return live_preview_live_main()
 
+    if args[0] == "live-preview" and len(args) == 2 and args[1] == "--with-overlay":
+        return main_live_with_overlay()
+
+    if args[0] == "game-overlay" and len(args) == 1:
+        return game_overlay_main()
+
     raise SystemExit(
         "Usage: python -m d4v.app analyze-candidates <path-to-candidates.json>\n"
         "   or: python -m d4v.app analyze-replay-roi <path-to-session-dir>\n"
@@ -42,7 +50,9 @@ def main(argv: list[str] | None = None) -> int:
         "   or: python -m d4v.app analyze-replay-ocr <path-to-session-dir>\n"
         "   or: python -m d4v.app capture-round\n"
         "   or: python -m d4v.app live-preview --replay <path-to-session-dir>\n"
-        "   or: python -m d4v.app live-preview --live"
+        "   or: python -m d4v.app live-preview --live\n"
+        "   or: python -m d4v.app live-preview --with-overlay\n"
+        "   or: python -m d4v.app game-overlay"
     )
 
 

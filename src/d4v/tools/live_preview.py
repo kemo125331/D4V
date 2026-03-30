@@ -2,16 +2,19 @@ from __future__ import annotations
 
 from collections import deque
 from pathlib import Path
+import queue
 import threading
 import time
+from typing import Callable
 
+import numpy as np
 from PIL import Image
 
 from d4v.capture.screen_capture import capture_game_window_image
 from d4v.capture.recorder import CaptureSessionConfig, FrameRecorder
 from d4v.capture.game_window import is_diablo_iv_foreground
 from d4v.domain.session_stats import SessionStats
-from d4v.overlay.view_model import PreviewViewModel
+from d4v.overlay.view_model import PreviewViewModel, MLModelInfo
 from d4v.tools.analyze_replay_ocr import (
     analyze_replay_ocr,
     frame_index_to_timestamp_ms,
@@ -141,6 +144,7 @@ class ReplayPreviewController:
             last_hit=self.last_hit,
             status=self.status,
             recent_hits=list(self.hit_log),
+            ml_model_info=MLModelInfo.detect_model(),
         )
 
 
@@ -176,7 +180,7 @@ class LivePreviewController:
         self.require_foreground = require_foreground
         self.vision_config = vision_config or VisionConfig()
         self.pipeline = pipeline or CombatTextPipeline(self.vision_config)
-        self.frame_skip = frame_skip  # Frame skip for performance
+        self.frame_skip = frame_skip
         self.stats = SessionStats()
         self.last_hit: int | None = None
         self.status = "Ready"
@@ -196,6 +200,13 @@ class LivePreviewController:
         self._live_capture_index = 0
         self._recent_detected_hits: deque[DetectedHit] = deque()
         self.hit_log: deque[str] = deque(maxlen=50)
+        # --- Background detector thread (live stream path only) ---
+        self._hit_queue: queue.Queue[list[DetectedHit]] = queue.Queue()
+        self._detector_stop_event = threading.Event()
+        self._detector_thread: threading.Thread | None = None
+        self._prev_frame_gray: np.ndarray | None = None
+        # Mean abs pixel diff below this threshold → skip OCR (frame hasn’t changed)
+        self._motion_diff_threshold: float = 3.0
 
     def start(self) -> None:
         if self.is_running:
@@ -212,8 +223,12 @@ class LivePreviewController:
         self._pending_error = None
         self._live_capture_index = 0
         self.status = f"Live capture started ({self.session_dir.name})"
+        # Start background detector for the live stream path
+        if self.summary_analyzer is None:
+            self._start_detector_thread()
 
     def stop(self) -> None:
+        self._stop_detector_thread()
         self.recorder.stop()
         if not self.background_refresh and self.session_dir is not None:
             self._refresh_from_session(force=True)
@@ -224,6 +239,14 @@ class LivePreviewController:
     def reset(self) -> None:
         if self.is_running:
             self.stop()
+        self._stop_detector_thread()
+        # Drain any queued hits
+        while not self._hit_queue.empty():
+            try:
+                self._hit_queue.get_nowait()
+            except queue.Empty:
+                break
+        self._prev_frame_gray = None
         self.stats.reset()
         self.last_hit = None
         self.status = "Ready"
@@ -239,20 +262,21 @@ class LivePreviewController:
         self.hit_log.clear()
 
     def tick(self, delta_ms: int) -> None:
-        self._apply_pending_refresh()
         if not self.is_running:
+            self._apply_pending_refresh()
             return
 
         self.elapsed_ms += delta_ms
-        if self.session_dir is None:
-            self.status = "Live capture error: no session directory"
-            return
 
+        # --- Summary-analyzer path (old file-based replay recording) — unchanged ---
         if self.summary_analyzer is not None:
+            self._apply_pending_refresh()
+            if self.session_dir is None:
+                self.status = "Live capture error: no session directory"
+                return
             if self.recorder.frames_written <= 0:
                 self.status = f"Live capture warming up ({self.elapsed_ms} ms)"
                 return
-
             if (
                 self.elapsed_ms - self._last_refresh_ms < self.refresh_interval_ms
                 and self.recorder.frames_written == self._last_seen_frames
@@ -260,15 +284,43 @@ class LivePreviewController:
                 if not self._refresh_in_progress:
                     self.status = f"Live capture ({self.recorder.frames_written} frames)"
                 return
-        elif self.elapsed_ms - self._last_refresh_ms < self.refresh_interval_ms:
-            if not self._refresh_in_progress:
-                self.status = (
-                    f"Live capture ({self._live_capture_index} samples, "
-                    f"{self.stats.hit_count} hits)"
-                )
+            self._refresh_from_session()
             return
 
-        self._refresh_from_session()
+        # --- Live stream path: drain the hit queue pushed by the detector thread ---
+        # This is fast (no OCR here); all heavy work happens in _detector_loop().
+        from d4v.overlay.view_model import format_damage_value
+        new_hits: list[DetectedHit] = []
+        try:
+            while True:
+                batch = self._hit_queue.get_nowait()
+                new_hits.extend(batch)
+        except queue.Empty:
+            pass
+
+        if new_hits:
+            recent_hits: deque[DetectedHit] = deque(self._recent_detected_hits)
+            for hit in new_hits:
+                if self._is_duplicate_live_hit(hit, recent_hits=recent_hits):
+                    continue
+                self.stats.add_hit(
+                    frame=hit.frame_index,
+                    timestamp_ms=hit.timestamp_ms,
+                    value=hit.parsed_value,
+                    confidence=hit.confidence,
+                )
+                self.last_hit = hit.parsed_value
+                self.hit_log.append(format_damage_value(hit.parsed_value))
+                self._recent_detected_hits.append(hit)
+                recent_hits.append(hit)
+            self._trim_recent_detected_hits(
+                current_frame_index=self._last_processed_frame_index
+            )
+
+        self.status = (
+            f"Live capture ({self._live_capture_index} samples, "
+            f"{self.stats.hit_count} hits)"
+        )
 
     def _refresh_from_session(self, force: bool = False) -> None:
         if self.session_dir is None:
@@ -401,6 +453,88 @@ class LivePreviewController:
 
         return new_hits
 
+    # ------------------------------------------------------------------
+    # Background detector thread — runs continuously while is_running
+    # ------------------------------------------------------------------
+
+    def _start_detector_thread(self) -> None:
+        """Spawn the background OCR worker (idempotent)."""
+        if self._detector_thread and self._detector_thread.is_alive():
+            return
+        self._detector_stop_event.clear()
+        self._detector_thread = threading.Thread(
+            target=self._detector_loop,
+            name="d4v-detector",
+            daemon=True,
+        )
+        self._detector_thread.start()
+
+    def _stop_detector_thread(self) -> None:
+        """Signal and join the background OCR worker."""
+        self._detector_stop_event.set()
+        if self._detector_thread and self._detector_thread.is_alive():
+            self._detector_thread.join(timeout=2.0)
+        self._detector_thread = None
+
+    def _detector_loop(self) -> None:
+        """Continuous OCR worker — runs on a dedicated thread.
+
+        Target rate: up to 12 OCR calls/second.
+        Motion diff gate: skips OCR when the screen hasn't changed
+        (saves 50-70% of Tesseract calls during idle/static moments).
+        """
+        # Minimum interval between OCR calls (ms) — prevents thrashing Tesseract
+        _MIN_INTERVAL_MS = 80.0
+        # Thumbnail size for cheap motion diffing (keeps diff cost < 1ms)
+        _THUMB_W, _THUMB_H = 320, 180
+
+        while not self._detector_stop_event.is_set():
+            loop_start = time.monotonic()
+
+            # Pause when D4 is not in the foreground
+            if (
+                self.require_foreground
+                and self._using_default_grabber
+                and not is_diablo_iv_foreground()
+            ):
+                self.status = "Game not in focus — paused"
+                time.sleep(0.5)
+                continue
+
+            image = self.screen_grabber()
+            if image is None:
+                time.sleep(0.05)
+                continue
+
+            # --- Motion diff gate -------------------------------------------
+            # Downscale to thumbnail, convert to float32, compare to previous.
+            thumb = image.resize((_THUMB_W, _THUMB_H)).convert("L")
+            gray_arr = np.array(thumb, dtype=np.float32)
+            should_ocr = True
+            if self._prev_frame_gray is not None:
+                if gray_arr.shape == self._prev_frame_gray.shape:
+                    diff = np.mean(np.abs(gray_arr - self._prev_frame_gray))
+                    should_ocr = diff >= self._motion_diff_threshold
+            self._prev_frame_gray = gray_arr
+            # ----------------------------------------------------------------
+
+            if should_ocr:
+                frame_index = self._live_capture_index
+                timestamp_ms = self.elapsed_ms  # written by UI thread — read-only here
+                self._live_capture_index += 1
+                self._last_processed_frame_index = frame_index
+
+                try:
+                    hits = list(self.pipeline.process_image(image, frame_index, timestamp_ms))
+                except Exception:
+                    hits = []
+
+                if hits:
+                    self._hit_queue.put(hits)
+            else:
+                # No motion detected — short sleep before re-checking
+                time.sleep(0.03)
+
     def _process_live_capture(self) -> list[DetectedHit]:
         """Process live capture with optional frame skipping for performance."""
         if self.require_foreground and self._using_default_grabber and not is_diablo_iv_foreground():
@@ -478,6 +612,7 @@ class LivePreviewController:
             last_hit=self.last_hit,
             status=self.status,
             recent_hits=list(self.hit_log),
+            ml_model_info=MLModelInfo.detect_model(),
         )
 
 
@@ -497,3 +632,90 @@ def main_live() -> int:
     controller = LivePreviewController(replay_dir=replay_dir)
     app = PreviewWindow(controller)
     return app.run()
+
+
+def main_live_with_overlay() -> int:
+    """Run live preview with both the preview window and game overlay.
+    
+    Note: Both windows share the same stats object and run in the same thread.
+    The game overlay updates are synchronized with the preview window tick.
+    """
+    from d4v.overlay.window import PreviewWindow
+    from d4v.overlay.game_overlay import GameOverlayWindow, GameOverlayViewModel
+    
+    replay_dir = Path.cwd() / "fixtures" / "replays"
+    replay_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Create shared controller for live preview
+    live_controller = LivePreviewController(replay_dir=replay_dir)
+    
+    print(f"[Overlay] Stats object ID: {id(live_controller.stats)}")
+    
+    # Create a proxy controller that reads from live_controller's stats
+    class OverlayControllerProxy:
+        def __init__(self, live_ctrl):
+            self.stats = live_ctrl.stats
+            self.last_hit = None
+            self.elapsed_ms = 0
+            self.is_running = True
+            
+        def start(self):
+            pass
+            
+        def view_model(self):
+            return GameOverlayViewModel.from_stats(
+                avg_damage=self.stats.average_hit,
+                last_damage=self.last_hit,
+                total_damage=self.stats.visible_damage_total,
+                hits_count=self.stats.hit_count,
+                dps=self.stats.rolling_dps(),
+            )
+    
+    overlay_controller = OverlayControllerProxy(live_controller)
+    
+    # Create preview window first (this will be the main window)
+    preview_app = PreviewWindow(live_controller)
+    
+    # Create overlay window with the proxy controller
+    overlay_app = GameOverlayWindow(overlay_controller, auto_start=False, debug=False)
+    
+    # Initial render
+    vm = overlay_controller.view_model()
+    overlay_app._apply_view_model(vm)
+    print(f"[Overlay] Initial: AVG={vm.avg_damage_label}, LAST={vm.last_damage_label}, TOTAL={vm.total_damage_label}")
+    
+    # Patch the preview window's tick to also update the overlay
+    original_tick = preview_app._schedule_tick
+    
+    _update_count = [0]
+    
+    def patched_tick():
+        _update_count[0] += 1
+        
+        # Sync overlay controller with live stats
+        overlay_controller.last_hit = live_controller.last_hit
+        overlay_controller.elapsed_ms = live_controller.elapsed_ms
+        
+        # Get fresh view model from current stats
+        overlay_view_model = overlay_controller.view_model()
+        
+        # Debug: check what we're trying to display
+        if _update_count[0] <= 5 or (live_controller.stats.hit_count > 0 and _update_count[0] <= 20):
+            print(f"[Tick {_update_count[0]}] Hits={live_controller.stats.hit_count}, Total={live_controller.stats.visible_damage_total:,}, Last={live_controller.last_hit}")
+            print(f"  -> View Model: AVG={overlay_view_model.avg_damage_label}, LAST={overlay_view_model.last_damage_label}, TOTAL={overlay_view_model.total_damage_label}")
+        
+        # Update overlay display
+        overlay_app._apply_view_model(overlay_view_model)
+        
+        # Debug: verify tkinter variables were set
+        if _update_count[0] <= 5 or (live_controller.stats.hit_count > 0 and _update_count[0] <= 20):
+            print(f"  -> Tkinter vars: avg={overlay_app._avg_var.get()}, last={overlay_app._last_var.get()}, total={overlay_app._total_var.get()}")
+        
+        overlay_app._update_position()
+        
+        original_tick()
+    
+    preview_app._schedule_tick = patched_tick
+    
+    # Run preview window (main loop)
+    return preview_app.run()

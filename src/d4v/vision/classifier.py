@@ -5,7 +5,9 @@ from d4v.domain.models import FloatingTextCandidate, FloatingTextKind
 
 _DAMAGE_TEXT_RE = re.compile(r"^\d[\d,]*(?:\.\d+)?[kmb]?$", re.IGNORECASE)
 _PLAUSIBLE_SUFFIXED_DAMAGE_RE = re.compile(r"^\d{1,5}(?:\.\d{1,3})?[KMB]$")
-_PLAUSIBLE_PLAIN_DAMAGE_RE = re.compile(r"^\d{3,10}$")
+_PLAUSIBLE_PLAIN_DAMAGE_RE = re.compile(r"^\d{2,10}$")
+# e.g. "1,000K" or "1,234K" — thousands-separator before the suffix
+_PLAUSIBLE_COMMA_SUFFIX_RE = re.compile(r"^\d{1,3},\d{3}[KMB]$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -85,6 +87,13 @@ def is_plausible_damage_text(text: str) -> bool:
     original = text.strip().replace(" ", "")
     if not original:
         return False
+
+    # Accept "1,000K" / "1,234M" style directly — these are valid D4 values
+    if _PLAUSIBLE_COMMA_SUFFIX_RE.fullmatch(original):
+        return True
+
+    # Reject ambiguous decimal-like patterns without a suffix ("1,23" looks like
+    # a non-English decimal, not a damage number)
     if not original[-1:].isalpha() and "," in original and "." not in original:
         parts = original.split(",")
         if len(parts) == 2 and 1 <= len(parts[1]) <= 2:

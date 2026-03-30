@@ -28,15 +28,20 @@ class VisionConfig:
         suffix_max_vertical_drift: Max vertical drift for suffix alignment.
     """
 
-    damage_roi: tuple[float, float, float, float] = (0.15, 0.05, 0.70, 0.75)
-    ocr_psm_modes: tuple[int, ...] = (8, 7)  # Two modes for better suffix capture
+    # capture sub-image already covers only the combat area (10%–90% width, 2%–84% height)
+    # so we use the full captured region here (no further cropping needed)
+    damage_roi: tuple[float, float, float, float] = (0.0, 0.0, 1.0, 1.0)
+    # PSM 7 = single text line — best for D4 floating numbers.
+    # Using a single mode avoids doubling the Tesseract call count (each call ~320ms).
+    ocr_psm_modes: tuple[int, ...] = (7,)
     ocr_whitelist: str = "0123456789.,kKmMbB"
-    min_confidence: float = 0.2  # Lower to catch more hits
-    dedupe_frame_window: int = 3
-    dedupe_center_distance: float = 70.0
-    max_line_candidates: int = 20  # More candidates to catch all damage numbers
-    image_upscale_factor: int = 8  # Higher upscale for better suffix recognition
-    ocr_border: int = 6  # More border context
+    min_confidence: float = 0.2
+    dedupe_frame_window: int = 2
+    dedupe_center_distance: float = 50.0
+    # D4 rarely shows more than 6 simultaneous floating numbers; cap at 8 for safety.
+    max_line_candidates: int = 8
+    image_upscale_factor: int = 8
+    ocr_border: int = 6
     suffix_max_width: int = 200
     suffix_max_height: int = 120
     suffix_max_gap: int = 120
