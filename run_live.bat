@@ -5,8 +5,7 @@ echo ============================================================
 echo D4V Live Preview - ML Enhanced Detection
 echo ============================================================
 echo.
-echo Setting Tesseract OCR path...
-set "TESSERACT_CMD=C:\Program Files\Tesseract-OCR\tesseract.exe"
+echo OCR Engine: WinOCR
 echo.
 echo Model Status: 100%% Accuracy ML Classifier
 echo Training Samples: 1,581

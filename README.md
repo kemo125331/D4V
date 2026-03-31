@@ -2,7 +2,7 @@
 
 **Diablo IV Combat Tracker with ML-Powered Detection**
 
-[![Python 3.14+](https://img.shields.io/badge/python-3.14+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 D4V is an experimental Diablo IV combat tracker built around screen capture and OCR, now enhanced with **100% accuracy ML-based detection**.
@@ -57,7 +57,7 @@ This repository is focused on the technical prototype for that workflow:
 - ✅ **ML confidence classifier** - 100% accuracy on test data
 - ✅ records replay sessions for analysis
 - ✅ isolates likely damage text using an OpenCV-powered HSV pipeline
-- ✅ groups and OCRs floating damage numbers via native pytesseract bindings
+- ✅ groups and OCRs floating damage numbers via WinOCR
 - ✅ parses `K`, `M`, and `B` suffixes into real values
 - ✅ deduplicates repeated readings across nearby frames
 - ✅ window focus tracking: pauses live capture when Diablo IV is not in focus
@@ -78,7 +78,7 @@ This project is in **production-ready stage** with ML-enhanced detection.
 
 - ✅ replay capture and offline analysis
 - ✅ fast OpenCV-based masking and connected components
-- ✅ native pytesseract OCR with fallback PSM modes
+- ✅ WinOCR-only OCR pipeline on Windows
 - ✅ **ML confidence scoring (100% accuracy)**
 - ✅ confidence filtering and frame-neighbor dedupe
 - ✅ automatic pausing when Diablo IV is not the foreground window
@@ -99,16 +99,12 @@ This project is in **production-ready stage** with ML-enhanced detection.
 
 ### Prerequisites
 
-1. **Install Tesseract OCR**: This project requires the Tesseract OCR engine installed on your system.
-   - **Windows**: Download from [UB-Mannheim Tesseract](https://github.com/UB-Mannheim/tesseract/wiki)
-   - **Linux**: `sudo apt install tesseract-ocr`
-   - **macOS**: `brew install tesseract`
-
-2. **Install Dependencies**:
+1. **Install Dependencies**:
 ```powershell
 uv sync
 uv run pytest -q
 ```
+**Note:** WinOCR is the only supported OCR engine. It is provided by Windows, so there is no separate OCR model download or Tesseract install step.
 
 ### Run Live Preview
 

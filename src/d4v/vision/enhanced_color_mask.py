@@ -65,39 +65,60 @@ class ColorRange:
 # Default color ranges for damage types
 DEFAULT_COLOR_RANGES: dict[DamageColor, ColorRange] = {
     DamageColor.YELLOW_ORANGE: ColorRange(
-        hue_min=10, hue_max=30,
-        sat_min=120, sat_max=255,
-        val_min=140, val_max=255,
+        hue_min=10,
+        hue_max=30,
+        sat_min=120,
+        sat_max=255,
+        val_min=140,
+        val_max=255,
     ),
     DamageColor.WHITE: ColorRange(
-        hue_min=0, hue_max=180,
-        sat_min=0, sat_max=40,
-        val_min=190, val_max=255,
+        hue_min=0,
+        hue_max=180,
+        sat_min=0,
+        sat_max=40,
+        val_min=190,
+        val_max=255,
     ),
     DamageColor.BLUE: ColorRange(
-        hue_min=90, hue_max=130,
-        sat_min=100, sat_max=255,
-        val_min=140, val_max=255,
+        hue_min=90,
+        hue_max=130,
+        sat_min=100,
+        sat_max=255,
+        val_min=140,
+        val_max=255,
     ),
     DamageColor.GREEN: ColorRange(
-        hue_min=50, hue_max=70,
-        sat_min=100, sat_max=255,
-        val_min=140, val_max=255,
+        hue_min=50,
+        hue_max=70,
+        sat_min=100,
+        sat_max=255,
+        val_min=140,
+        val_max=255,
     ),
     DamageColor.RED: ColorRange(
-        hue_min=0, hue_max=10,
-        sat_min=150, sat_max=255,
-        val_min=140, val_max=255,
+        hue_min=0,
+        hue_max=10,
+        sat_min=150,
+        sat_max=255,
+        val_min=140,
+        val_max=255,
     ),
     DamageColor.PURPLE: ColorRange(
-        hue_min=130, hue_max=160,
-        sat_min=80, sat_max=255,
-        val_min=140, val_max=255,
+        hue_min=130,
+        hue_max=160,
+        sat_min=80,
+        sat_max=255,
+        val_min=140,
+        val_max=255,
     ),
     DamageColor.GOLD: ColorRange(
-        hue_min=25, hue_max=35,
-        sat_min=150, sat_max=255,
-        val_min=180, val_max=255,
+        hue_min=25,
+        hue_max=35,
+        sat_min=150,
+        sat_max=255,
+        val_min=180,
+        val_max=255,
     ),
 }
 
@@ -184,7 +205,6 @@ class EnhancedColorMask:
         color_range = self.color_ranges.get(color_type)
         if color_range is None:
             # Return empty mask
-            from PIL import Image
             empty_mask = Image.new("L", image.size, 0)
             return ColorMaskResult(
                 mask=empty_mask,
@@ -194,8 +214,12 @@ class EnhancedColorMask:
             )
 
         # Create mask
-        lower = np.array([color_range.hue_min, color_range.sat_min, color_range.val_min])
-        upper = np.array([color_range.hue_max, color_range.sat_max, color_range.val_max])
+        lower = np.array(
+            [color_range.hue_min, color_range.sat_min, color_range.val_min]
+        )
+        upper = np.array(
+            [color_range.hue_max, color_range.sat_max, color_range.val_max]
+        )
         mask_arr = cv2.inRange(hsv, lower, upper)
 
         # Count pixels
@@ -416,7 +440,9 @@ class EnhancedColorMask:
         elif fill_ratio < 0.01:
             ratio_score = fill_ratio / 0.01
         else:
-            ratio_score = max(0, 1.0 - (fill_ratio - 0.10) / 0.40)
+            # Gradual penalty for high fill ratios, but don't zero out
+            # completely filled images (they may still be valid detections)
+            ratio_score = max(0.1, 1.0 - (fill_ratio - 0.10) / 0.90)
 
         # Color-specific adjustments
         color_confidence = {

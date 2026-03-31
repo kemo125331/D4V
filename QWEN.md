@@ -33,7 +33,7 @@ src/d4v/
 │   ├── color_mask.py      # HSV-based combat text segmentation (OpenCV)
 │   ├── segments.py        # Connected components for token isolation
 │   ├── grouping.py        # Group nearby tokens into lines
-│   ├── ocr.py             # Tesseract OCR via pytesseract
+│   ├── ocr.py             # WinOCR-based damage text extraction
 │   ├── classifier.py      # Damage text validation and parsing
 │   ├── dedupe.py          # Temporal deduplication of repeated readings
 │   └── roi.py             # Region-of-interest scaling utilities
@@ -55,10 +55,10 @@ src/d4v/
 
 | Component | Technology |
 |-----------|------------|
-| Language | Python 3.14+ |
+| Language | Python 3.12+ |
 | Capture | `mss` (screen capture) |
 | Vision | `opencv-python`, `numpy`, `Pillow` |
-| OCR | `pytesseract` (Tesseract bindings) |
+| OCR | `winocr` (Windows Runtime OCR) |
 | UI | `PySide6` (overlay window) |
 | Testing | `pytest` |
 | Packaging | `uv`, `hatchling` |
@@ -69,13 +69,9 @@ src/d4v/
 
 ### Prerequisites
 
-1. **Install Tesseract OCR** (required):
-   - Download from: https://github.com/UB-Mannheim/tesseract/wiki
-   - Add to PATH or set `TESSERACT_CMD` environment variable
+1. **Install Python 3.12+**
 
-2. **Install Python 3.14+**
-
-3. **Install uv** (if not already installed):
+2. **Install uv** (if not already installed):
    ```powershell
    pip install uv
    ```
@@ -147,7 +143,7 @@ uv run d4v analyze-replay-tokens <session-dir>
 | `docs/research/2026-03-25-diablo4-overlay-research.md` | Technical research on reference projects |
 | `docs/specs/mvp.md` | MVP specification and requirements |
 | `src/d4v/domain/models.py` | Core data models (DamageEvent, StableDamageHit) |
-| `src/d4v/vision/ocr.py` | OCR pipeline with Tesseract integration |
+| `src/d4v/vision/ocr.py` | OCR pipeline with WinOCR integration |
 | `src/d4v/tools/live_preview.py` | Live and replay preview controllers |
 
 ---
@@ -158,7 +154,7 @@ uv run d4v analyze-replay-tokens <session-dir>
 
 - ✅ Replay capture and offline analysis
 - ✅ OpenCV-based masking and connected components
-- ✅ Native pytesseract OCR with PSM fallback modes (8/7/13)
+- ✅ Native WinOCR pipeline for damage-number reading
 - ✅ Confidence filtering and frame-neighbor deduplication
 - ✅ Automatic pause when Diablo IV loses foreground focus
 - ✅ Replay summary generation (total damage, hit count, biggest hit, DPS timeline)
@@ -169,14 +165,6 @@ uv run d4v analyze-replay-tokens <session-dir>
 - ⚠️ Live hit recall for very short-lived floating numbers needs improvement
 - ⚠️ Transparent overlay pinned to game window not yet implemented
 - ⚠️ Kill tracking remains experimental
-
----
-
-## Environment Variables
-
-| Variable | Purpose |
-|----------|---------|
-| `TESSERACT_CMD` | Path to Tesseract executable (if not in PATH) |
 
 ---
 

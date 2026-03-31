@@ -28,7 +28,7 @@ Important takeaways:
 - Mature Diablo IV tools are out-of-process overlays, not in-game mods.
 - They rely on screen capture, OCR, template matching, resolution presets, and window tracking.
 - `d4lf` goes further by using Diablo IV accessibility/TTS plumbing for item text, but that does not give us a clean combat-event API.
-- `Diablo-4-XP-and-gold-per-hour` proves that Python + Tesseract can successfully parse rapidly updating Diablo 4 UI text (resources), though damage numbers are harder.
+- `Diablo-4-XP-and-gold-per-hour` proves that Python OCR can successfully parse rapidly updating Diablo 4 UI text (resources), though damage numbers are harder.
 - Neither reference project provides a ready-made live damage meter or kill counter pipeline, but other ARPG communities (like Aion 2 and PoE 2) are actively experimenting with Python OCR DPS trackers.
 
 ## Hard Constraints

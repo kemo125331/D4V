@@ -11,7 +11,7 @@
 This plan outlines 15 improvements to the D4V combat text detection system, organized into 4 phases over ~8 weeks. The improvements target accuracy, performance, feature completeness, and platform support.
 
 **Current State:**
-- Vision-first OCR pipeline using OpenCV + Tesseract
+- Vision-first OCR pipeline using OpenCV + WinOCR
 - Heuristic confidence scoring (0.6 threshold)
 - Fixed ROI, single-frame processing
 - Windows-only, no formal benchmarks

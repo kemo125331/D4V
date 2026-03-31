@@ -49,7 +49,7 @@ _merged
 ### Step 1: Install Dependencies
 
 ```bash
-pip install opencv-python numpy pillow pytesseract mss
+uv sync
 ```
 
 ### Step 2: Run Batch Processing
@@ -154,17 +154,6 @@ python scripts/benchmark_pipeline.py compare results/v1.json results/v2.json
 ---
 
 ## Troubleshooting
-
-### Tesseract Not Found
-
-**Error:** `TesseractNotFoundError`
-
-**Solution:**
-```bash
-# Install Tesseract OCR
-# Windows: Download from https://github.com/UB-Mannheim/tesseract/wiki
-# Then add to PATH
-```
 
 ### OpenCV Not Available
 

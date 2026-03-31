@@ -1,43 +1,18 @@
-"""OCR module — WinOCR primary engine with Tesseract fallback.
+"""OCR module — WinOCR-only damage text recognition.
 
-WinOCR (Windows.Media.Ocr) runs at 1-15ms per call via the built-in
-Windows Runtime OCR engine.  Tesseract is kept as a fallback for cases
-where WinOCR returns nothing (e.g. very small crops, unusual glyphs).
-
-The public API (`ocr_pil_image`) is unchanged — callers don't need to
-know which engine produced the result.
+WinOCR (Windows.Media.Ocr) is the only supported OCR engine in this
+project. The public API remains unchanged so the rest of the pipeline
+does not need to know which OCR backend is in use.
 """
+
 from __future__ import annotations
 
-import os
 import re
-from typing import TYPE_CHECKING
-
-import cv2
-import numpy as np
-import pytesseract
 from PIL import Image
 
 from d4v.vision.classifier import parse_damage_value
 
-if TYPE_CHECKING:
-    pass
-
-# ---------------------------------------------------------------------------
-# Startup configuration
-# ---------------------------------------------------------------------------
-
 _OCR_NOISE_RE = re.compile(r"[^0-9kKmMbB,.\-]")
-
-
-def _configure_tesseract() -> None:
-    """Apply TESSERACT_CMD env-var if set (pytesseract honours it natively)."""
-    env_path = os.environ.get("TESSERACT_CMD")
-    if env_path:
-        pytesseract.pytesseract.tesseract_cmd = env_path
-
-
-_configure_tesseract()
 
 # Try to import WinOCR; gracefully fall back if unavailable.
 _HAS_WINOCR = False
@@ -47,11 +22,6 @@ try:
     _HAS_WINOCR = True
 except ImportError:
     _winocr_recognize = None  # type: ignore[assignment]
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
 
 
 def ocr_image(
@@ -70,11 +40,11 @@ def ocr_pil_image(
     *,
     rgb_source: Image.Image | None = None,
 ) -> str:
-    """Run OCR on a mask image, trying WinOCR first, then Tesseract.
+    """Run OCR on a mask image with WinOCR.
 
     Args:
         image: Binary/grayscale mask crop of the candidate region.
-        psm_modes: Tesseract PSM modes (fallback only).
+        psm_modes: Unused. Kept for API compatibility.
         whitelist: Allowed characters.
         rgb_source: Optional original RGB crop (same region). If provided,
             WinOCR uses this instead of the mask — it performs much better
@@ -83,13 +53,10 @@ def ocr_pil_image(
     Returns:
         Best OCR text found, cleaned and scored.
     """
-    # --- WinOCR path (fast: 1-15ms) ----------------------------------------
     if _HAS_WINOCR:
-        result = _run_winocr(image, rgb_source=rgb_source)
-        if result:
-            return result
-    # --- Tesseract fallback (slow: 120-300ms) ------------------------------
-    return _run_tesseract(image, psm_modes=psm_modes, whitelist=whitelist)
+        return _run_winocr(image, rgb_source=rgb_source)
+
+    return ""
 
 
 # ---------------------------------------------------------------------------
@@ -140,7 +107,9 @@ def _run_winocr(
         sf2 = max(4, 120 // max(h2, 1))
         rgb_up = rgb_source.resize((w2 * sf2, h2 * sf2), Image.NEAREST)
         # Add padding
-        padded_rgb = Image.new("RGB", (rgb_up.width + 20, rgb_up.height + 20), (0, 0, 0))
+        padded_rgb = Image.new(
+            "RGB", (rgb_up.width + 20, rgb_up.height + 20), (0, 0, 0)
+        )
         padded_rgb.paste(rgb_up, (10, 10))
         try:
             r = _winocr_recognize(padded_rgb, lang="en")
@@ -151,65 +120,6 @@ def _run_winocr(
             pass
 
     return choose_best_ocr_candidate(candidates)
-
-
-# ---------------------------------------------------------------------------
-# Tesseract engine (fallback)
-# ---------------------------------------------------------------------------
-
-
-def _run_tesseract(
-    image: Image.Image,
-    psm_modes: tuple[int, ...] = (7,),
-    whitelist: str = "0123456789.,kKmMbB",
-) -> str:
-    """Run Tesseract OCR — the slow but reliable fallback."""
-    prepared = prepare_image_object_for_ocr(image)
-    candidates: list[str] = []
-    for psm in psm_modes:
-        config = f"--psm {psm} --oem 3 -c tessedit_char_whitelist={whitelist}"
-        try:
-            raw = pytesseract.image_to_string(prepared, config=config)
-            candidates.append(clean_ocr_text(raw))
-        except pytesseract.TesseractNotFoundError as exc:
-            raise FileNotFoundError(
-                "Tesseract executable not found. Install Tesseract and set "
-                "the TESSERACT_CMD env-var if needed."
-            ) from exc
-        except Exception:
-            continue
-
-    return choose_best_ocr_candidate(candidates)
-
-
-# ---------------------------------------------------------------------------
-# Image preparation (OpenCV-based, for Tesseract)
-# ---------------------------------------------------------------------------
-
-
-def prepare_image_object_for_ocr(image: Image.Image) -> Image.Image:
-    """
-    Upscale, dilate, and binarise a grayscale mask image for Tesseract.
-
-    Steps:
-      1. Convert to grayscale numpy array.
-      2. Upscale 4× with NEAREST (preserve hard digit edges).
-      3. Dilate with a 3×3 kernel (equivalent to PIL MaxFilter(3)).
-      4. Binary threshold — any non-zero pixel → 255.
-      5. Convert back to PIL "L".
-    """
-    gray = np.array(image.convert("L"))
-    h, w = gray.shape
-    upscaled = cv2.resize(gray, (w * 4, h * 4), interpolation=cv2.INTER_NEAREST)
-    kernel = np.ones((3, 3), np.uint8)
-    dilated = cv2.dilate(upscaled, kernel, iterations=1)
-    _, binary = cv2.threshold(dilated, 0, 255, cv2.THRESH_BINARY)
-    return Image.fromarray(binary, mode="L")
-
-
-# ---------------------------------------------------------------------------
-# Text post-processing helpers
-# ---------------------------------------------------------------------------
 
 
 def clean_ocr_text(text: str) -> str:

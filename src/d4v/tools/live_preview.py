@@ -68,7 +68,9 @@ class ReplayPreviewController:
     ) -> None:
         self.session_name = session_name
         self.duration_ms = duration_ms
-        self.stable_hits = sorted(stable_hits, key=lambda hit: (hit.timestamp_ms, hit.frame_index))
+        self.stable_hits = sorted(
+            stable_hits, key=lambda hit: (hit.timestamp_ms, hit.frame_index)
+        )
         self.stats = SessionStats()
         self.last_hit: int | None = None
         self.status = "Ready"
@@ -127,6 +129,7 @@ class ReplayPreviewController:
             )
             self.last_hit = hit.parsed_value
             from d4v.overlay.view_model import format_damage_value
+
             self.hit_log.append(f"{format_damage_value(hit.parsed_value)}")
             self._next_hit_index += 1
 
@@ -169,7 +172,9 @@ class LivePreviewController:
         frame_skip: int = 0,  # No frame skipping - process all frames for better detection
     ) -> None:
         self.replay_dir = replay_dir
-        self.session_name = session_name or f"live-preview-{time.strftime('%Y%m%d-%H%M%S')}"
+        self.session_name = (
+            session_name or f"live-preview-{time.strftime('%Y%m%d-%H%M%S')}"
+        )
         self.fps = fps
         self.refresh_interval_ms = refresh_interval_ms
         self.summary_analyzer = analyzer
@@ -282,7 +287,9 @@ class LivePreviewController:
                 and self.recorder.frames_written == self._last_seen_frames
             ):
                 if not self._refresh_in_progress:
-                    self.status = f"Live capture ({self.recorder.frames_written} frames)"
+                    self.status = (
+                        f"Live capture ({self.recorder.frames_written} frames)"
+                    )
                 return
             self._refresh_from_session()
             return
@@ -290,6 +297,7 @@ class LivePreviewController:
         # --- Live stream path: drain the hit queue pushed by the detector thread ---
         # This is fast (no OCR here); all heavy work happens in _detector_loop().
         from d4v.overlay.view_model import format_damage_value
+
         new_hits: list[DetectedHit] = []
         try:
             while True:
@@ -325,14 +333,18 @@ class LivePreviewController:
     def _refresh_from_session(self, force: bool = False) -> None:
         if self.session_dir is None:
             return
-        frame_count = self.recorder.frames_written if self.summary_analyzer is not None else 0
+        frame_count = (
+            self.recorder.frames_written if self.summary_analyzer is not None else 0
+        )
         if self.summary_analyzer is not None and not force and frame_count <= 0:
             return
         if self._refresh_in_progress:
             if self.summary_analyzer is not None:
                 self.status = f"Analyzing live capture ({frame_count} frames)"
             else:
-                self.status = f"Analyzing live capture ({self._live_capture_index} samples)"
+                self.status = (
+                    f"Analyzing live capture ({self._live_capture_index} samples)"
+                )
             return
 
         if not self.background_refresh:
@@ -361,7 +373,9 @@ class LivePreviewController:
         )
         self._refresh_thread.start()
 
-    def _run_refresh(self, *, session_dir: Path, frame_count: int, use_summary_analyzer: bool) -> None:
+    def _run_refresh(
+        self, *, session_dir: Path, frame_count: int, use_summary_analyzer: bool
+    ) -> None:
         try:
             if use_summary_analyzer:
                 assert self.summary_analyzer is not None
@@ -384,7 +398,9 @@ class LivePreviewController:
         with self._refresh_lock:
             self._pending_summary = summary
             self._pending_stream_hits = stream_hits
-            self._pending_frame_count = frame_count if use_summary_analyzer else self._live_capture_index
+            self._pending_frame_count = (
+                frame_count if use_summary_analyzer else self._live_capture_index
+            )
             self._refresh_in_progress = False
 
     def _apply_pending_refresh(self) -> None:
@@ -417,10 +433,13 @@ class LivePreviewController:
                 )
                 self.last_hit = hit.parsed_value
                 from d4v.overlay.view_model import format_damage_value
+
                 self.hit_log.append(f"{format_damage_value(hit.parsed_value)}")
                 self._recent_detected_hits.append(hit)
                 applied_hit_count += 1
-            self._trim_recent_detected_hits(current_frame_index=self._last_processed_frame_index)
+            self._trim_recent_detected_hits(
+                current_frame_index=self._last_processed_frame_index
+            )
             count_label = "samples"
         else:
             return
@@ -449,7 +468,9 @@ class LivePreviewController:
                 recent_hits.append(hit)
 
             self._last_processed_frame_index = frame_index
-            self._trim_recent_detected_hits(current_frame_index=frame_index, hits=recent_hits)
+            self._trim_recent_detected_hits(
+                current_frame_index=frame_index, hits=recent_hits
+            )
 
         return new_hits
 
@@ -481,9 +502,9 @@ class LivePreviewController:
 
         Target rate: up to 12 OCR calls/second.
         Motion diff gate: skips OCR when the screen hasn't changed
-        (saves 50-70% of Tesseract calls during idle/static moments).
+        (saves OCR calls during idle/static moments).
         """
-        # Minimum interval between OCR calls (ms) — prevents thrashing Tesseract
+        # Minimum interval between OCR calls (ms) — prevents OCR thrashing
         _MIN_INTERVAL_MS = 80.0
         # Thumbnail size for cheap motion diffing (keeps diff cost < 1ms)
         _THUMB_W, _THUMB_H = 320, 180
@@ -525,7 +546,9 @@ class LivePreviewController:
                 self._last_processed_frame_index = frame_index
 
                 try:
-                    hits = list(self.pipeline.process_image(image, frame_index, timestamp_ms))
+                    hits = list(
+                        self.pipeline.process_image(image, frame_index, timestamp_ms)
+                    )
                 except Exception:
                     hits = []
 
@@ -537,12 +560,19 @@ class LivePreviewController:
 
     def _process_live_capture(self) -> list[DetectedHit]:
         """Process live capture with optional frame skipping for performance."""
-        if self.require_foreground and self._using_default_grabber and not is_diablo_iv_foreground():
+        if (
+            self.require_foreground
+            and self._using_default_grabber
+            and not is_diablo_iv_foreground()
+        ):
             self.status = "Game not in focus — paused"
             return []
 
         # Frame skipping: only process every Nth frame (if frame_skip > 0)
-        if self.frame_skip > 0 and self._live_capture_index % (self.frame_skip + 1) != 0:
+        if (
+            self.frame_skip > 0
+            and self._live_capture_index % (self.frame_skip + 1) != 0
+        ):
             # Skip this frame but still increment counter
             self._live_capture_index += 1
             return []
@@ -564,7 +594,9 @@ class LivePreviewController:
             recent_hits.append(hit)
 
         self._last_processed_frame_index = frame_index
-        self._trim_recent_detected_hits(current_frame_index=frame_index, hits=recent_hits)
+        self._trim_recent_detected_hits(
+            current_frame_index=frame_index, hits=recent_hits
+        )
         return new_hits
 
     def _is_duplicate_live_hit(
@@ -636,21 +668,21 @@ def main_live() -> int:
 
 def main_live_with_overlay() -> int:
     """Run live preview with both the preview window and game overlay.
-    
+
     Note: Both windows share the same stats object and run in the same thread.
     The game overlay updates are synchronized with the preview window tick.
     """
     from d4v.overlay.window import PreviewWindow
     from d4v.overlay.game_overlay import GameOverlayWindow, GameOverlayViewModel
-    
+
     replay_dir = Path.cwd() / "fixtures" / "replays"
     replay_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Create shared controller for live preview
     live_controller = LivePreviewController(replay_dir=replay_dir)
-    
+
     print(f"[Overlay] Stats object ID: {id(live_controller.stats)}")
-    
+
     # Create a proxy controller that reads from live_controller's stats
     class OverlayControllerProxy:
         def __init__(self, live_ctrl):
@@ -658,10 +690,10 @@ def main_live_with_overlay() -> int:
             self.last_hit = None
             self.elapsed_ms = 0
             self.is_running = True
-            
+
         def start(self):
             pass
-            
+
         def view_model(self):
             return GameOverlayViewModel.from_stats(
                 avg_damage=self.stats.average_hit,
@@ -670,58 +702,72 @@ def main_live_with_overlay() -> int:
                 hits_count=self.stats.hit_count,
                 dps=self.stats.rolling_dps(),
             )
-    
+
     overlay_controller = OverlayControllerProxy(live_controller)
-    
+
     # Create preview window first (this will be the main window)
     preview_app = PreviewWindow(live_controller)
-    
+
     # Create overlay window with the proxy controller (use Toplevel to avoid Tk conflict)
-    overlay_app = GameOverlayWindow(overlay_controller, auto_start=False, debug=False, use_toplevel=True)
-    
+    overlay_app = GameOverlayWindow(
+        overlay_controller, auto_start=False, debug=False, use_toplevel=True
+    )
+
     # Make sure overlay window is visible
     overlay_app.root.deiconify()
-    
+
     # Initial render
     vm = overlay_controller.view_model()
     overlay_app._apply_view_model(vm)
-    print(f"[Overlay] Initial: AVG={vm.avg_damage_label}, LAST={vm.last_damage_label}, TOTAL={vm.total_damage_label}")
-    
+    print(
+        f"[Overlay] Initial: AVG={vm.avg_damage_label}, LAST={vm.last_damage_label}, TOTAL={vm.total_damage_label}"
+    )
+
     # Patch the preview window's tick to also update the overlay
     original_tick = preview_app._schedule_tick
-    
+
     _update_count = [0]
-    
+
     def patched_tick():
         _update_count[0] += 1
-        
+
         # Sync overlay controller with live stats
         overlay_controller.last_hit = live_controller.last_hit
         overlay_controller.elapsed_ms = live_controller.elapsed_ms
-        
+
         # Get fresh view model from current stats
         overlay_view_model = overlay_controller.view_model()
-        
+
         # Debug: check what we're trying to display
-        if _update_count[0] <= 10 or (live_controller.stats.hit_count > 0 and _update_count[0] <= 30):
-            print(f"[Tick {_update_count[0]}] Hits={live_controller.stats.hit_count}, Total={live_controller.stats.visible_damage_total:,}, Last={live_controller.last_hit}")
-            print(f"  -> View Model: AVG={overlay_view_model.avg_damage_label}, LAST={overlay_view_model.last_damage_label}, TOTAL={overlay_view_model.total_damage_label}")
+        if _update_count[0] <= 10 or (
+            live_controller.stats.hit_count > 0 and _update_count[0] <= 30
+        ):
+            print(
+                f"[Tick {_update_count[0]}] Hits={live_controller.stats.hit_count}, Total={live_controller.stats.visible_damage_total:,}, Last={live_controller.last_hit}"
+            )
+            print(
+                f"  -> View Model: AVG={overlay_view_model.avg_damage_label}, LAST={overlay_view_model.last_damage_label}, TOTAL={overlay_view_model.total_damage_label}"
+            )
             print(f"  -> Status: {live_controller.status}")
-        
+
         # Update overlay display
         overlay_app._apply_view_model(overlay_view_model)
-        
+
         # Debug: verify tkinter variables were set
-        if _update_count[0] <= 10 or (live_controller.stats.hit_count > 0 and _update_count[0] <= 30):
-            print(f"  -> Tkinter vars: avg={overlay_app._avg_var.get()}, last={overlay_app._last_var.get()}, total={overlay_app._total_var.get()}")
-        
+        if _update_count[0] <= 10 or (
+            live_controller.stats.hit_count > 0 and _update_count[0] <= 30
+        ):
+            print(
+                f"  -> Tkinter vars: avg={overlay_app._avg_var.get()}, last={overlay_app._last_var.get()}, total={overlay_app._total_var.get()}"
+            )
+
         # Only update position if user hasn't moved the window
         if not overlay_app._user_moved:
             overlay_app._update_position()
-        
+
         original_tick()
-    
+
     preview_app._schedule_tick = patched_tick
-    
+
     # Run preview window (main loop)
     return preview_app.run()
