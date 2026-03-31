@@ -150,9 +150,9 @@ class MotionDetector:
         except ImportError:
             return []
 
-        # Convert to grayscale
-        curr_gray = cv2.cvtColor(np.array(current.convert("L")), cv2.COLOR_GRAY2BGR)
-        prev_gray = cv2.cvtColor(np.array(previous.convert("L")), cv2.COLOR_GRAY2BGR)
+        # Convert to grayscale (single channel for findContours)
+        curr_gray = np.array(current.convert("L"))
+        prev_gray = np.array(previous.convert("L"))
 
         # Apply Gaussian blur
         curr_blur = cv2.GaussianBlur(curr_gray, (self.blur_kernel, self.blur_kernel), 0)
@@ -169,7 +169,9 @@ class MotionDetector:
         dilated = cv2.dilate(thresh, kernel, iterations=2)
 
         # Find contours
-        contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours, _ = cv2.findContours(
+            dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE
+        )
 
         # Extract motion regions
         regions: list[MotionRegion] = []
@@ -181,14 +183,16 @@ class MotionDetector:
             x, y, w, h = cv2.boundingRect(contour)
             motion_score = min(area / 10000, 1.0)  # Normalize
 
-            regions.append(MotionRegion(
-                x=x + w / 2,
-                y=y + h / 2,
-                width=w,
-                height=h,
-                motion_score=motion_score,
-                frame=frame,
-            ))
+            regions.append(
+                MotionRegion(
+                    x=x + w / 2,
+                    y=y + h / 2,
+                    width=w,
+                    height=h,
+                    motion_score=motion_score,
+                    frame=frame,
+                )
+            )
 
         return regions
 
@@ -298,14 +302,20 @@ class AdaptiveRoiTracker:
             Current AdaptiveRoiState.
         """
         # Detect motion
-        motion_regions = self.motion_detector.detect_motion(current, previous, frame_index)
-        motion_score = sum(r.motion_score for r in motion_regions) / max(len(motion_regions), 1)
+        motion_regions = self.motion_detector.detect_motion(
+            current, previous, frame_index
+        )
+        motion_score = sum(r.motion_score for r in motion_regions) / max(
+            len(motion_regions), 1
+        )
         self.motion_history.append(motion_score)
 
         # Track damage positions
         if damage_detections:
             for det in damage_detections:
-                self.damage_positions.append((det.get("center_x", 0), det.get("center_y", 0)))
+                self.damage_positions.append(
+                    (det.get("center_x", 0), det.get("center_y", 0))
+                )
 
         # Calculate expansion
         expansion = self._calculate_expansion(motion_regions, damage_detections)
@@ -413,7 +423,9 @@ class AdaptiveRoiTracker:
                 reason = "cooldown"
 
         # Calculate confidence
-        confidence = 1.0 - (expansion / self.max_expansion) if self.max_expansion > 0 else 1.0
+        confidence = (
+            1.0 - (expansion / self.max_expansion) if self.max_expansion > 0 else 1.0
+        )
 
         return AdaptiveRoiState(
             left=left,
@@ -441,8 +453,12 @@ class AdaptiveRoiTracker:
 
         left = int(width * self.base_roi[0]) - self.current_expansion
         top = int(height * self.base_roi[1]) - self.current_expansion
-        right = int(width * (self.base_roi[0] + self.base_roi[2])) + self.current_expansion
-        bottom = int(height * (self.base_roi[1] + self.base_roi[3])) + self.current_expansion
+        right = (
+            int(width * (self.base_roi[0] + self.base_roi[2])) + self.current_expansion
+        )
+        bottom = (
+            int(height * (self.base_roi[1] + self.base_roi[3])) + self.current_expansion
+        )
 
         # Clamp
         left = max(0, left)
@@ -485,7 +501,9 @@ class AdaptiveRoiTracker:
         left = int(width * self.base_roi[0]) - predicted_expansion
         top = int(height * self.base_roi[1]) - predicted_expansion
         right = int(width * (self.base_roi[0] + self.base_roi[2])) + predicted_expansion
-        bottom = int(height * (self.base_roi[1] + self.base_roi[3])) + predicted_expansion
+        bottom = (
+            int(height * (self.base_roi[1] + self.base_roi[3])) + predicted_expansion
+        )
 
         # Clamp
         left = max(0, left)
@@ -508,7 +526,11 @@ class AdaptiveRoiTracker:
         Returns:
             Dictionary of statistics.
         """
-        avg_motion = sum(self.motion_history) / len(self.motion_history) if self.motion_history else 0.0
+        avg_motion = (
+            sum(self.motion_history) / len(self.motion_history)
+            if self.motion_history
+            else 0.0
+        )
 
         return {
             "current_expansion": self.current_expansion,
@@ -538,7 +560,9 @@ class RoiPredictor:
         """
         self.history_size = history_size
         self.prediction_frames = prediction_frames
-        self.position_history: deque[tuple[int, float, float]] = deque(maxlen=history_size)
+        self.position_history: deque[tuple[int, float, float]] = deque(
+            maxlen=history_size
+        )
 
     def add_position(self, frame: int, x: float, y: float) -> None:
         """Add damage position to history.

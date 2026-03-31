@@ -170,13 +170,6 @@ python -c "import json; d=json.load(open('fixtures/training_data.json')); print(
 
 ## Troubleshooting
 
-### Tesseract Not Found
-
-```bash
-# Install Tesseract OCR
-# Download from: https://github.com/UB-Mannheim/tesseract/wiki
-```
-
 ### OpenCV Not Available
 
 ```bash

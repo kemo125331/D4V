@@ -13,7 +13,11 @@ from typing import Protocol, runtime_checkable
 import PIL.ImageOps
 from PIL import Image
 
-from d4v.vision.classifier import is_plausible_damage_text, normalize_damage_text, parse_damage_value
+from d4v.vision.classifier import (
+    is_plausible_damage_text,
+    normalize_damage_text,
+    parse_damage_value,
+)
 from d4v.vision.color_mask import build_combat_text_mask
 from d4v.vision.config import VisionConfig
 from d4v.vision.grouping import GroupedCandidate, group_bounding_boxes
@@ -115,12 +119,14 @@ class CombatTextPipeline:
             model_path: Path to ML confidence model. Uses default if None.
         """
         self.config = config or VisionConfig()
-        
+
         # Initialize ML confidence classifier
         if model_path is None:
             # Use default model location
-            model_path = Path(__file__).parent.parent / "models" / "confidence_model.joblib"
-        
+            model_path = (
+                Path(__file__).parent.parent / "models" / "confidence_model.joblib"
+            )
+
         self.confidence_classifier = ConfidenceClassifier(
             model_path=Path(model_path),
             threshold=0.3,  # Lower threshold to catch more hits (was 0.5)
@@ -140,7 +146,7 @@ class CombatTextPipeline:
 
         # --- Pre-downscale ------------------------------------------------
         # Benchmarked at 47ms saved on mask+segment vs full 2048px input.
-        # OCR upscaling compensates — Tesseract never sees the downscaled size.
+        # OCR upscaling compensates for the reduced processing size.
         # Also exclude bottom 12% (HUD/minimap) before any processing.
         crop = crop.crop((0, 0, crop.width, int(crop.height * 0.88)))
         if crop.width > _MAX_PROC_WIDTH:
@@ -169,9 +175,8 @@ class CombatTextPipeline:
             return []
 
         # --- Parallel OCR (persistent pool) --------------------------------
-        # WinOCR primary (1-15ms) + Tesseract fallback (120-300ms).
-        # Tesseract releases the GIL; running N candidates concurrently keeps
-        # fallback time near 1 call. Persistent pool saves startup overhead.
+        # WinOCR is fast enough that parallel candidate OCR stays inexpensive.
+        # Persistent pool still saves per-frame scheduling overhead.
         def _ocr_group(grouped: GroupedCandidate) -> tuple[GroupedCandidate, str]:
             pad = self.config.ocr_border
             left = max(0, grouped.left - pad)
@@ -179,7 +184,7 @@ class CombatTextPipeline:
             right = min(crop.width, grouped.right + pad + 1)
             bottom = min(crop.height, grouped.bottom + pad + 1)
 
-            # Mask crop for Tesseract fallback
+            # Mask crop for OCR-ready monochrome text
             line_mask = mask.crop((left, top_, right, bottom)).convert("L")
 
             # RGB crop for WinOCR (colour text on game background)
@@ -194,11 +199,13 @@ class CombatTextPipeline:
             return grouped, text
 
         # Include all grouped_candidates so suffix scan can read their text too
-        all_ocr_targets = list({
-            id(g): g for g in ranked_lines + [
-                g for g in grouped_candidates if g not in ranked_lines
-            ]
-        }.values())
+        all_ocr_targets = list(
+            {
+                id(g): g
+                for g in ranked_lines
+                + [g for g in grouped_candidates if g not in ranked_lines]
+            }.values()
+        )
 
         ocr_futures = {_OCR_POOL.submit(_ocr_group, g): g for g in all_ocr_targets}
         group_text_cache: dict[tuple[int, int, int, int], str] = {}
@@ -209,7 +216,6 @@ class CombatTextPipeline:
             except Exception:
                 pass
         # --------------------------------------------------------------------
-
 
         def read_group_text(grouped: GroupedCandidate) -> str:
             return group_text_cache.get(
@@ -233,7 +239,9 @@ class CombatTextPipeline:
                     raw_text = f"{normalized_text}{suffix_hint}"
                     normalized_text = normalize_damage_text(raw_text)
 
-            parsed_value = parse_damage_value(normalized_text) if normalized_text else None
+            parsed_value = (
+                parse_damage_value(normalized_text) if normalized_text else None
+            )
             confidence = self._score_ocr_result(
                 raw_text=normalized_text,
                 parsed_value=parsed_value,
@@ -270,7 +278,11 @@ class CombatTextPipeline:
         if not text:
             return False
         normalized = normalize_damage_text(text)
-        return bool(normalized) and normalized[-1:].isdigit() and parse_damage_value(normalized) is not None
+        return (
+            bool(normalized)
+            and normalized[-1:].isdigit()
+            and parse_damage_value(normalized) is not None
+        )
 
     def _find_adjacent_suffix_hint(
         self,
@@ -287,7 +299,10 @@ class CombatTextPipeline:
                 continue
             if candidate.left <= target_group.right:
                 continue
-            if candidate.width > self.config.suffix_max_width or candidate.height > self.config.suffix_max_height:
+            if (
+                candidate.width > self.config.suffix_max_width
+                or candidate.height > self.config.suffix_max_height
+            ):
                 continue
 
             gap = candidate.left - target_group.right - 1
@@ -297,7 +312,10 @@ class CombatTextPipeline:
             target_center_y = (target_group.top + target_group.bottom) / 2
             candidate_center_y = (candidate.top + candidate.bottom) / 2
             max_height = max(target_group.height, candidate.height)
-            if abs(target_center_y - candidate_center_y) > max_height * self.config.suffix_max_vertical_drift:
+            if (
+                abs(target_center_y - candidate_center_y)
+                > max_height * self.config.suffix_max_vertical_drift
+            ):
                 continue
 
             suffix_text = normalize_damage_text(read_group_text(candidate))
@@ -381,8 +399,8 @@ class CombatTextPipeline:
             pixel_count=pixel_count,
             raw_text=raw_text,
         )
-        
+
         # Get ML prediction
         prediction = self.confidence_classifier.predict(features)
-        
+
         return prediction.confidence

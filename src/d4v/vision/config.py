@@ -14,7 +14,7 @@ class VisionConfig:
 
     Attributes:
         damage_roi: Relative ROI for damage text detection (left, top, width, height).
-        ocr_psm_modes: Tesseract PSM modes to try, in priority order.
+        ocr_psm_modes: Reserved for OCR compatibility. Currently unused.
         ocr_whitelist: Character whitelist for OCR.
         min_confidence: Minimum confidence threshold for accepting hits.
         dedupe_frame_window: Frame window for temporal deduplication.
@@ -31,8 +31,7 @@ class VisionConfig:
     # capture sub-image already covers only the combat area (10%–90% width, 2%–84% height)
     # so we use the full captured region here (no further cropping needed)
     damage_roi: tuple[float, float, float, float] = (0.0, 0.0, 1.0, 1.0)
-    # PSM 7 = single text line — best for D4 floating numbers.
-    # Using a single mode avoids doubling the Tesseract call count (each call ~320ms).
+    # Kept for backward compatibility with older OCR call sites.
     ocr_psm_modes: tuple[int, ...] = (7,)
     ocr_whitelist: str = "0123456789.,kKmMbB"
     min_confidence: float = 0.2
