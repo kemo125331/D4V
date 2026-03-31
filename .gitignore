@@ -9,4 +9,10 @@ fixtures/debug-live-screen.png
 *.log
 /fixtures
 /D4V/.agents
+<<<<<<< Updated upstream
+=======
+/docs
+/docs
+/docs/specs
+>>>>>>> Stashed changes
 /D4V/.specify

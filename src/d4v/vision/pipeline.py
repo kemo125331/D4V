@@ -124,7 +124,13 @@ class CombatTextPipeline:
         if model_path is None:
             # Use default model location
             model_path = (
+<<<<<<< Updated upstream
                 Path(__file__).parent.parent / "models" / "confidence_model.joblib"
+=======
+                Path(__file__).resolve().parents[3]
+                / "models"
+                / "confidence_model.joblib"
+>>>>>>> Stashed changes
             )
 
         self.confidence_classifier = ConfidenceClassifier(
