@@ -15,7 +15,6 @@ class MLModelInfo:
     """Information about the loaded ML model."""
 
     is_custom: bool
-    accuracy: str
     sample_count: int
     session_count: int
     status_color: str = "green"
@@ -31,42 +30,42 @@ class MLModelInfo:
 
         # Check if custom model exists and is being used
         if custom_model.exists():
-            # Custom model detected
             return cls(
                 is_custom=True,
-                accuracy="95%+",
                 sample_count=2000,  # Approximate after custom training
                 session_count=40,  # Approximate
                 status_color="green",
             )
         elif generic_model.exists():
-            # Generic model
             return cls(
                 is_custom=False,
-                accuracy="75-80%",
                 sample_count=1581,
                 session_count=33,
-                status_color="orange",
+                status_color="green",
             )
         else:
-            # No model found
             return cls(
                 is_custom=False,
-                accuracy="N/A",
                 sample_count=0,
                 session_count=0,
-                status_color="red",
+                status_color="orange",
             )
 
     @property
     def display_text(self) -> str:
         """Return formatted display text for the model status."""
         if self.is_custom:
-            return f"✓ Custom Model | {self.accuracy} Accuracy | {self.sample_count:,} samples"
+            return (
+                f"✓ Custom ML model | {self.sample_count:,} samples | "
+                f"{self.session_count} sessions"
+            )
         elif self.sample_count > 0:
-            return f"⚠ Generic Model | {self.accuracy} Accuracy | {self.sample_count:,} samples"
+            return (
+                f"✓ Bundled ML model | {self.sample_count:,} samples | "
+                f"{self.session_count} sessions"
+            )
         else:
-            return "✗ No Model Found"
+            return "⚠ Heuristic scoring only | no ML model file"
 
 
 @dataclass(frozen=True)

@@ -42,14 +42,14 @@ class PreviewWindow:
         # ML Model Status
         ml_frame = ttk.LabelFrame(outer, text="ML Detection Model", padding=8)
         ml_frame.pack(fill=tk.X, pady=(0, 12))
-        
+
         self._ml_model_label = ttk.Label(
             ml_frame,
             textvariable=self._ml_model_var,
             font=("Segoe UI", 9),
         )
         self._ml_model_label.pack(anchor="w")
-        
+
         # Train button row
         train_btn_frame = ttk.Frame(ml_frame)
         train_btn_frame.pack(anchor="w", pady=(8, 0))
@@ -60,7 +60,7 @@ class PreviewWindow:
         ).pack(side=tk.LEFT)
         ttk.Label(
             train_btn_frame,
-            text="  Collect your gameplay data for 95%+ accuracy",
+            text="  Collect gameplay data for a custom model",
             font=("Segoe UI", 8),
             foreground="gray",
         ).pack(side=tk.LEFT)
@@ -78,20 +78,28 @@ class PreviewWindow:
             text=str(getattr(self.controller, "start_button_label", "Start")),
             command=self.start,
         ).pack(side=tk.LEFT)
-        ttk.Button(controls, text="Stop", command=self.stop).pack(side=tk.LEFT, padx=(8, 0))
-        ttk.Button(controls, text="Reset", command=self.reset).pack(side=tk.LEFT, padx=(8, 0))
+        ttk.Button(controls, text="Stop", command=self.stop).pack(
+            side=tk.LEFT, padx=(8, 0)
+        )
+        ttk.Button(controls, text="Reset", command=self.reset).pack(
+            side=tk.LEFT, padx=(8, 0)
+        )
 
         log_frame = ttk.LabelFrame(outer, text="Recent Hits Log")
         log_frame.pack(fill=tk.BOTH, expand=True, pady=(16, 0))
 
         self._listbox = tk.Listbox(log_frame, height=6, font=("Consolas", 10))
-        scrollbar = ttk.Scrollbar(log_frame, orient=tk.VERTICAL, command=self._listbox.yview)
+        scrollbar = ttk.Scrollbar(
+            log_frame, orient=tk.VERTICAL, command=self._listbox.yview
+        )
         self._listbox.configure(yscrollcommand=scrollbar.set)
 
         self._listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(4, 0), pady=4)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y, pady=4)
 
-    def _metric_row(self, parent: ttk.Frame, label: str, variable: tk.StringVar) -> None:
+    def _metric_row(
+        self, parent: ttk.Frame, label: str, variable: tk.StringVar
+    ) -> None:
         row = ttk.Frame(parent)
         row.pack(fill=tk.X, pady=2)
         ttk.Label(row, text=f"{label}:", width=14).pack(side=tk.LEFT)
@@ -132,7 +140,7 @@ class PreviewWindow:
         self._last_hit_var.set(view_model.last_hit_label)
         self._status_var.set(view_model.status_label)
         self._ml_model_var.set(view_model.ml_model_info.display_text)
-        
+
         # Update ML model label color based on status
         self._ml_model_label.configure(foreground=view_model.ml_model_info.status_color)
 
@@ -150,19 +158,24 @@ class PreviewWindow:
         """Open the custom training guide in the default browser."""
         import webbrowser
         from pathlib import Path
-        
-        guide_path = Path(__file__).parent.parent.parent.parent / "docs" / "CUSTOM_TRAINING_GUIDE.md"
+
+        guide_path = (
+            Path(__file__).parent.parent.parent.parent
+            / "docs"
+            / "CUSTOM_TRAINING_GUIDE.md"
+        )
         if guide_path.exists():
             # Open the markdown file - it will open in default app or browser
             webbrowser.open(f"file://{guide_path.absolute()}")
         else:
             # Fallback: show a message box
             import tkinter.messagebox as messagebox
+
             messagebox.showinfo(
                 "Training Guide",
                 "Custom Training Guide not found.\n\n"
                 "See docs/CUSTOM_TRAINING_GUIDE.md for instructions on training "
-                "a custom model on your gameplay data."
+                "a custom model on your gameplay data.",
             )
 
     def run(self) -> int:
