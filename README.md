@@ -1,33 +1,38 @@
 # D4V
 
-**Diablo IV Combat Tracker with ML-Powered Detection**
+**Windows-first Diablo IV combat tracker prototype**
 
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-D4V is an experimental Diablo IV combat tracker built around screen capture and OCR, now enhanced with **100% accuracy ML-based detection**.
+D4V is an out-of-process Diablo IV combat tracker built around screen capture, OCR, and replay-first validation. It watches floating combat text, turns values like `246K` or `10.3M` into numbers, and shows rolling combat stats in a live preview window or transparent overlay.
 
-The goal is to detect floating combat text on screen, turn values like `246k` or `10.3M` into real numbers, and show useful live stats in a lightweight overlay or companion window.
+## Current Implementation
 
----
+- Windows-focused runtime
+- WinOCR is the only supported OCR engine
+- Screen capture is bound to the Diablo IV window ROI
+- Live capture pauses when Diablo IV is not the foreground window
+- Replay analysis and live preview share the same vision pipeline
+- Transparent overlay exists and can run with the live preview
+- ML confidence scoring is used to filter OCR candidates
 
-## 🚀 What's New (v2.0 - ML Enhanced)
+## What Works Today
 
-### ML-Powered Detection
-- **100% Accuracy** confidence classifier (logistic regression)
-- Trained on **1,581 samples** from **33 replay sessions**
-- Replaces heuristic scoring with learned ML predictions
-- Zero false positives, zero false negatives on test data
+- replay capture for later analysis
+- offline replay OCR analysis
+- live preview window with recent hits and session stats
+- transparent Tk overlay with click-through support
+- persisted overlay settings and saved overlay position
+- OpenCV-based masking, grouping, and candidate extraction
+- damage parsing with `K`, `M`, `B`, and `T` display formatting
+- temporal deduplication across nearby frames
+- adaptive ROI and multi-frame voting code paths
+- damage-type and kill-tracking related pipeline code
 
-### Enhanced Features
-- **Multi-frame OCR voting** - 30%+ error reduction
-- **Adaptive ROI tracking** - 95%+ capture rate (vs 85% fixed)
-- **7-color damage segmentation** - poison, cold, fire, lightning, etc.
-- **8-type damage classification** - direct, crit, DoT, shield, healing, etc.
-- **Kill tracking pipeline** - XP orbs, gold drops, death signals
-- **High FPS capture** - 60+ FPS for short-lived text
-- **Cross-platform support** - Windows, Linux, macOS
+## Current Constraints
 
+<<<<<<< Updated upstream
 ### Developer Tools
 - **Benchmark infrastructure** - precision/recall/F1 metrics
 - **Automated regression testing** - catch performance drops
@@ -94,183 +99,117 @@ This project is in **production-ready stage** with ML-enhanced detection.
 - a real transparent overlay pinned to Diablo IV instead of the current preview window
 
 ---
+=======
+- Windows only in practice because OCR depends on WinOCR
+- combat numbers are still estimates derived from OCR, not game telemetry
+- live detection can still misread or inflate values on difficult frames
+- the repository contains research and experimental tooling alongside the main runtime
+>>>>>>> Stashed changes
 
 ## Quick Start
 
 ### Prerequisites
 
+<<<<<<< Updated upstream
 1. **Install Dependencies**:
+=======
+1. Install Python 3.12+
+2. Install `uv`
+3. Run:
+
+>>>>>>> Stashed changes
 ```powershell
 uv sync
 uv run pytest -q
 ```
 **Note:** WinOCR is the only supported OCR engine. It is provided by Windows, so there is no separate OCR model download or Tesseract install step.
 
-### Run Live Preview
+No separate Tesseract or PaddleOCR install is required. WinOCR is provided by Windows.
 
-**Double-click:** `run_live.bat`
+## Main Commands
 
-**Or command line:**
+### Live Preview
+
 ```powershell
 uv run d4v live-preview --live
 ```
 
-### Run Replay Analysis
+### Live Preview With Overlay
 
 ```powershell
-uv run d4v live-preview --replay fixtures/replays/second-round
+uv run d4v live-preview --with-overlay
 ```
 
-### Analyze Replay with OCR
+### Replay Preview
 
 ```powershell
-uv run d4v analyze-replay-ocr fixtures/replays/second-round
+uv run d4v live-preview --replay fixtures/replays/<session-name>
 ```
 
-### Verify ML Deployment
+### Replay OCR Analysis
 
 ```powershell
-python scripts/verify_deployment.py
+uv run d4v analyze-replay-ocr fixtures/replays/<session-name>
 ```
 
-**Expected Output:**
-```
-✓ Model file exists
-✓ Model loaded successfully
-✓ Hit prediction works: 100.00% (hit)
-✓ Miss prediction works: 16.52% (no_hit)
-✓ Pipeline loaded with ML classifier
-✓ ML classifier attached to pipeline
+### Capture A Session
 
-Deployment Verification: SUCCESS ✅
+```powershell
+uv run d4v capture-round
 ```
 
----
+### Overlay Only
 
-## ML Model Performance
-
-### Training Data
-- **Sessions:** 33 replay sessions
-- **Samples:** 1,581 OCR candidates
-- **Positive (hits):** 244
-- **Negative (misses):** 1,337
-
-### Test Set Results
-| Metric | Score |
-|--------|-------|
-| **Accuracy** | **100.00%** |
-| **Precision** | **100.00%** |
-| **Recall** | **100.00%** |
-| **F1 Score** | **100.00%** |
-
-### Confusion Matrix
-```
-              Predicted
-            Miss   Hit
-Actual  Miss   268     0    ← Zero false positives
-        Hit     0    49    ← Zero false negatives
+```powershell
+uv run d4v game-overlay
 ```
 
----
+## Runtime Notes
+
+- `run_live.bat` starts the live preview with the overlay
+- `capture_game_window_image()` defaults to `require_foreground=True`
+- when Diablo IV is not focused, live capture pauses instead of reading desktop content
+- if WinOCR is unavailable, OCR currently returns an empty result instead of falling back to another engine
 
 ## Project Structure
 
-```
+```text
 src/d4v/
-├── benchmark/              # ML benchmarking infrastructure
-├── capture/                # frame recording and screen capture
-├── domain/                 # combat models and session aggregation
-├── logging/                # structured detection logging
-├── overlay/                # lightweight preview UI
-├── profiling/              # pipeline performance profiling
-├── tools/                  # replay analyzers and live preview
-└── vision/                 # masking, segmentation, OCR, ML classifier
-    ├── confidence_model.py # ML confidence classifier
-    ├── ocr_voting.py       # multi-frame OCR voting
-    ├── adaptive_roi.py     # motion-based ROI tracking
-    ├── enhanced_color_mask.py  # 7-color damage segmentation
-    └── damage_classifier.py    # 8-type damage classification
+├── app.py                  # CLI entry point
+├── capture/                # window detection, screen capture, recording
+├── domain/                 # combat/session models and aggregation
+├── overlay/                # preview UI, overlay window, overlay config
+├── tools/                  # live preview and replay analysis commands
+└── vision/                 # masking, grouping, OCR, ML scoring
 ```
 
----
+## Development Status
+
+This is still a prototype, not a production-finished tracker.
+
+The codebase currently has:
+
+- a working WinOCR-only OCR path
+- a working overlay path integrated with live preview
+- a passing automated test suite on the merged codebase
+- ongoing accuracy and recall work for hard combat frames
 
 ## Design Principles
 
-- no memory reading or game injection
-- vision-first, replay-first validation
-- **ML-enhanced detection (100% accuracy)**
-- clear iteration from offline analysis to live tracking
-- accuracy before overlay polish
-
----
-
-## Screenshots
-
-Repository screenshots are not committed yet because the current local captures include active game and desktop content that should be cleaned up before publishing.
-
-Once the live overlay path is more stable, this section should include:
-
-- a clean replay preview screenshot
-- a live preview screenshot with ML status display
-- a small pipeline artifact example showing OCR-ready grouped combat text
-
----
-
-## Roadmap
-
-### Completed ✅
-- [x] ML confidence classifier (100% accuracy)
-- [x] Multi-frame OCR voting
-- [x] Adaptive ROI tracking
-- [x] Enhanced color segmentation (7 colors)
-- [x] Damage type classification (8 types)
-- [x] Kill tracking pipeline
-- [x] High FPS capture (60+ FPS)
-- [x] Benchmark infrastructure
-- [x] Automated regression testing
-- [x] Pipeline profiling
-- [x] Enhanced logging
-
-### In Progress
-- [ ] Improve live hit recall for short-lived numbers
-- [ ] Transparent overlay pinned to game window
-
-### Future
-- [ ] Kill confirmation from death animations
-- [ ] Per-skill DPS breakdown
-- [ ] Enemy health bar tracking
-- [ ] Loot tracking integration
-- [ ] Build/export session reports
-
----
+- no memory reading or injection
+- replay-first validation
+- keep OCR-derived stats clearly separate from authoritative game data
+- prefer small, testable iterations over large speculative changes
 
 ## Documentation
 
-- [`docs/DEPLOYMENT_COMPLETE.md`](docs/DEPLOYMENT_COMPLETE.md) - ML deployment guide
-- [`docs/TRAINING_SUMMARY.md`](docs/TRAINING_SUMMARY.md) - Training data summary
-- [`docs/training-results.md`](docs/training-results.md) - ML training results (100% accuracy)
-- [`docs/batch-processing-guide.md`](docs/batch-processing-guide.md) - Batch processing guide
-- [`docs/GUI_UPDATED.md`](docs/GUI_UPDATED.md) - GUI updates
-- [`docs/plans/detection-improvements-final.md`](docs/plans/detection-improvements-final.md) - Full implementation summary
-
----
+- `docs/DEPLOYMENT_COMPLETE.md`
+- `docs/TRAINING_SUMMARY.md`
+- `docs/training-results.md`
+- `docs/batch-processing-guide.md`
+- `docs/GAME_OVERLAY.md`
+- `docs/plans/detection-improvements-final.md`
 
 ## License
 
-This project is released under the MIT License. See [LICENSE](LICENSE).
-
----
-
-## Notes
-
-The repository intentionally focuses on the tracker and analysis pipeline. Large local replay captures and generated artifacts are kept out of version control.
-
-**ML Model:** The deployed model (`models/confidence_model.joblib`) achieves 100% accuracy on test data with 1,581 training samples from 33 replay sessions.
-
----
-
-## 🎉 Production Ready
-
-**Start now:** Double-click `run_live.bat` or run `uv run d4v live-preview --live`
-
-Your D4V detection system uses a **production-perfect ML model** with **100% accuracy**!
+MIT
