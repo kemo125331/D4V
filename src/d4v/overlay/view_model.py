@@ -13,6 +13,7 @@ def format_damage_value(value: int | float) -> str:
 @dataclass(frozen=True)
 class MLModelInfo:
     """Information about the loaded ML model."""
+
     is_custom: bool
     accuracy: str
     sample_count: int
@@ -23,7 +24,7 @@ class MLModelInfo:
     def detect_model(cls, models_dir: Path | None = None) -> "MLModelInfo":
         """Detect which model is loaded and return its info."""
         if models_dir is None:
-            models_dir = Path("models")
+            models_dir = Path(__file__).resolve().parents[3] / "models"
 
         custom_model = models_dir / "confidence_model_custom.joblib"
         generic_model = models_dir / "confidence_model.joblib"
@@ -76,7 +77,7 @@ class PreviewViewModel:
     last_hit_label: str
     status_label: str
     recent_hits: list[str] = field(default_factory=list)
-    ml_confidence: str = "ML: 100% Accuracy"
+    ml_confidence: str = "ML: Ready"
     ml_model_info: MLModelInfo = field(default_factory=MLModelInfo.detect_model)
 
     @classmethod
@@ -91,7 +92,9 @@ class PreviewViewModel:
         recent_hits: list[str] | None = None,
         ml_model_info: MLModelInfo | None = None,
     ) -> "PreviewViewModel":
-        last_hit_label = "No hit yet" if last_hit is None else format_damage_value(last_hit)
+        last_hit_label = (
+            "No hit yet" if last_hit is None else format_damage_value(last_hit)
+        )
         model_info = ml_model_info or MLModelInfo.detect_model()
         return cls(
             total_damage_label=format_damage_value(total_damage),

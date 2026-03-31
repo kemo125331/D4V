@@ -32,97 +32,23 @@ D4V is an out-of-process Diablo IV combat tracker built around screen capture, O
 
 ## Current Constraints
 
-<<<<<<< Updated upstream
-### Developer Tools
-- **Benchmark infrastructure** - precision/recall/F1 metrics
-- **Automated regression testing** - catch performance drops
-- **Synthetic data generation** - test without game captures
-- **Pipeline profiling** - bottleneck identification
-- **Enhanced logging** - structured detection decisions
-
----
-
-## Why This Exists
-
-Diablo IV does not expose a simple built-in combat meter for the kind of session tracking this project is aiming for. D4V explores a non-invasive path: read what the player already sees on screen and build useful combat stats from that.
-
-This repository is focused on the technical prototype for that workflow:
-
-- capture the game view
-- isolate floating combat text
-- OCR and normalize damage numbers
-- **ML confidence scoring (100% accuracy)**
-- deduplicate repeated readings across nearby frames
-- aggregate those readings into totals, hit counts, and DPS
-
----
-
-## What It Does Today
-
-- ✅ **ML confidence classifier** - 100% accuracy on test data
-- ✅ records replay sessions for analysis
-- ✅ isolates likely damage text using an OpenCV-powered HSV pipeline
-- ✅ groups and OCRs floating damage numbers via WinOCR
-- ✅ parses `K`, `M`, and `B` suffixes into real values
-- ✅ deduplicates repeated readings across nearby frames
-- ✅ window focus tracking: pauses live capture when Diablo IV is not in focus
-- ✅ builds replay summaries with total damage, hit count, biggest hit, and a DPS timeline
-- ✅ includes a live preview prototype for real-time testing
-- ✅ **damage type classification** - direct, crit, DoT, shield, healing
-- ✅ **kill tracking** - infer kills from XP orbs, gold drops
-- ✅ **adaptive ROI** - motion-based region expansion
-- ✅ **multi-frame voting** - consistent OCR across frames
-
----
-
-## Current Status
-
-This project is in **production-ready stage** with ML-enhanced detection.
-
-### What is working well:
-
-- ✅ replay capture and offline analysis
-- ✅ fast OpenCV-based masking and connected components
-- ✅ WinOCR-only OCR pipeline on Windows
-- ✅ **ML confidence scoring (100% accuracy)**
-- ✅ confidence filtering and frame-neighbor dedupe
-- ✅ automatic pausing when Diablo IV is not the foreground window
-- ✅ replay summary generation with total damage, hit count, biggest hit, and DPS buckets
-- ✅ **damage type classification**
-- ✅ **kill tracking pipeline**
-- ✅ **adaptive ROI tracking**
-- ✅ **multi-frame OCR voting**
-
-### What still needs work:
-
-- better live hit recall for very short-lived floating numbers
-- a real transparent overlay pinned to Diablo IV instead of the current preview window
-
----
-=======
 - Windows only in practice because OCR depends on WinOCR
 - combat numbers are still estimates derived from OCR, not game telemetry
 - live detection can still misread or inflate values on difficult frames
 - the repository contains research and experimental tooling alongside the main runtime
->>>>>>> Stashed changes
 
 ## Quick Start
 
 ### Prerequisites
 
-<<<<<<< Updated upstream
-1. **Install Dependencies**:
-=======
 1. Install Python 3.12+
 2. Install `uv`
 3. Run:
 
->>>>>>> Stashed changes
 ```powershell
 uv sync
 uv run pytest -q
 ```
-**Note:** WinOCR is the only supported OCR engine. It is provided by Windows, so there is no separate OCR model download or Tesseract install step.
 
 No separate Tesseract or PaddleOCR install is required. WinOCR is provided by Windows.
 
