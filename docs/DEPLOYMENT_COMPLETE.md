@@ -3,8 +3,8 @@
 ## Deployment Summary
 
 **Date:** 2026-03-30  
-**Model Version:** v2 (100% Accuracy)  
-**Status:** ✅ **PRODUCTION LIVE**
+**Model Version:** v2 (validation build)  
+**Status:** ✅ **VALIDATED PROTOTYPE**
 
 ---
 
@@ -12,7 +12,7 @@
 
 ### 1. ML Confidence Classifier
 - **Model:** `models/confidence_model.joblib`
-- **Accuracy:** 100.00%
+- **Accuracy:** 98.63%
 - **Training Data:** 1,581 samples from 33 sessions
 - **Type:** Logistic Regression with ML features
 
@@ -24,7 +24,7 @@
 ### 3. GUI Updates
 - **File:** `src/d4v/overlay/window.py`
 - **Change:** Added ML model status display
-- **Display:** "✓ 100% Accuracy | 1,581 samples | 33 sessions"
+- **Display:** "✓ ML Ready | 1,581 samples | 33 sessions"
 
 ### 4. Batch File
 - **File:** `run_live.bat`
@@ -56,14 +56,14 @@ uv run d4v live-preview --live
 ```
 ┌─────────────────────────────────────┐
 │ ML Detection Model                  │
-│ ✓ 100% Accuracy | 1,581 samples    │
-│           | 33 sessions             │
+│ ✓ ML Model Ready | 1,581 samples   │
+│             | 33 sessions          │
 └─────────────────────────────────────┘
 ```
 
 ### Recent Hits Log
 ```
-✓ ML: 100% Accuracy          [Green]
+✓ ML: Ready                  [Green]
 12,345 (98.50%)              [Black]
 8,901 (95.20%)               [Black]
 ...
@@ -100,8 +100,8 @@ D4V ML Model Deployment Verification
 
 ✓ Model file exists
 ✓ Model loaded successfully
-✓ Hit prediction works: 100.00% (hit)
-✓ Miss prediction works: 16.52% (no_hit)
+✓ Hit prediction works
+✓ Miss prediction works
 ✓ Pipeline loaded with ML classifier
 ✓ ML classifier attached to pipeline
 
@@ -118,10 +118,10 @@ Deployment Verification: SUCCESS ✅
 
 | Metric | Value |
 |--------|-------|
-| Accuracy | 100.00% |
-| Precision | 100.00% |
+| Accuracy | 98.63% |
+| Precision | 96.43% |
 | Recall | 100.00% |
-| F1 Score | 100.00% |
+| F1 Score | 98.18% |
 | Training Samples | 1,581 |
 | Sessions | 33 |
 
@@ -262,20 +262,20 @@ If performance drops:
 
 ### After Deployment
 
-- ✅ ML classifier (100% accuracy)
+- ✅ ML classifier enabled
 - ✅ Learned features (automatic)
-- ✅ Production model deployed
-- ✅ Excellent generalization
+- ✅ Model deployment path documented
+- ✅ Confidence scoring available in the pipeline
 
 ---
 
 ## 🎉 Congratulations!
 
-Your D4V detection system now uses a **production-perfect ML model** with **100% accuracy**!
+Your D4V detection system now uses the bundled ML classifier when available, with heuristic fallback if it cannot be loaded.
 
 **Ready to use:**
 ```bash
 run_live.bat
 ```
 
-**Enjoy your enhanced detection system!** 🚀
+**Use this as a validation-focused deployment, not a production guarantee.** 🚀

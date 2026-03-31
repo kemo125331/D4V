@@ -21,7 +21,7 @@ This plan outlines 15 improvements to the D4V combat text detection system, orga
 - ML-enhanced confidence scoring with ground truth validation
 - Adaptive ROI with motion prediction
 - Multi-frame voting, enhanced color segmentation
-- Cross-platform support (Windows, Linux, macOS)
+- Windows-first capture and overlay (non-Windows support later)
 - >90% precision/recall with published benchmarks
 
 ---

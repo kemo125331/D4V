@@ -6,7 +6,7 @@
 
 **Architecture:** Use a Python-first desktop architecture with separate capture, vision, domain, overlay, and storage modules. The first milestone is replayable signal validation from recorded footage, then a live overlay once the damage pipeline is good enough.
 
-**Tech Stack:** Python, `mss`, `opencv-python`, `numpy`, `PySide6`, `pytest`, `uv`
+**Tech Stack:** Python, `mss`, `opencv-python`, `numpy`, `tkinter`, `pytest`, `uv`
 
 ---
 

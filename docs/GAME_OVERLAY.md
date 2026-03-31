@@ -52,8 +52,7 @@ Run just the preview window (original behavior):
 # Using CLI
 uv run d4v live-preview --live
 
-# Or using batch file
-.\run_live.bat
+# Note: run_live.bat starts the combined preview + overlay mode
 ```
 
 ## Architecture
@@ -118,8 +117,8 @@ The overlay can:
 
 - Windows 11 (for window positioning APIs)
 - Diablo IV running (for auto-positioning)
-- Python 3.14+
-- PySide6 or Tkinter (included with Python)
+- Python 3.12+
+- Tkinter (included with Python)
 
 ## Troubleshooting
 
@@ -144,8 +143,6 @@ The overlay can:
 ## Future Enhancements
 
 Potential improvements:
-- [ ] Click-through toggle (Windows API)
-- [ ] Custom position/size settings
 - [ ] Additional stats (crit rate, hit frequency)
 - [ ] Configurable update rate
 - [ ] Multiple overlay themes

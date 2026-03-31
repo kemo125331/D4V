@@ -50,7 +50,7 @@ The following can exist in the codebase during MVP, but must be labeled experime
 - parsing undocumented game memory for combat events
 - build importing, loot filtering, or trading features
 - supporting every Diablo IV UI configuration on day one
-- cross-platform support
+- non-Windows support in the MVP
 
 ## Functional Requirements
 
