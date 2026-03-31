@@ -8,3 +8,5 @@ fixtures/debug-live-screen.png
 
 *.log
 /fixtures
+/D4V/.agents
+/D4V/.specify
