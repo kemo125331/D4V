@@ -1,6 +1,7 @@
 .venv/
 .pytest_cache/
 __pycache__/
+**/__pycache__/
 *.pyc
 
 fixtures/replays/
@@ -11,3 +12,13 @@ fixtures/debug-live-screen.png
 /D4V/.agents
 /D4V/.specify
 /docs
+**/bin/
+**/obj/
+.vs/
+TestResults/
+build/
+dist/
+
+# Mario
+.mario/
+agent.md

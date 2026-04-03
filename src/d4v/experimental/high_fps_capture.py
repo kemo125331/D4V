@@ -5,6 +5,8 @@ Improves detection of fast-fading damage numbers through:
 - Motion-based prediction
 - Reduced processing latency
 - Priority queuing for OCR
+
+EXPERIMENTAL: This module is not yet integrated into the main pipeline.
 """
 
 from __future__ import annotations
@@ -13,17 +15,12 @@ import time
 from collections import deque
 from dataclasses import dataclass, field
 from threading import Event, Thread
-from typing import Any, Callable, Protocol
+from typing import Any, Callable
 
 from PIL import Image
 
-
-class FrameSource(Protocol):
-    """Protocol for frame capture sources."""
-
-    def capture_frame(self) -> Image.Image | None:
-        """Capture a single frame."""
-        ...
+# Import from main pipeline to avoid duplicate Protocol
+from d4v.vision.pipeline import FrameSource
 
 
 @dataclass(frozen=True)

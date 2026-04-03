@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from d4v.runtime_paths import bundled_models_dir
+
 
 def format_damage_value(value: int | float) -> str:
     if isinstance(value, float) and not value.is_integer():
@@ -23,7 +25,7 @@ class MLModelInfo:
     def detect_model(cls, models_dir: Path | None = None) -> "MLModelInfo":
         """Detect which model is loaded and return its info."""
         if models_dir is None:
-            models_dir = Path(__file__).resolve().parents[3] / "models"
+            models_dir = bundled_models_dir()
 
         custom_model = models_dir / "confidence_model_custom.joblib"
         generic_model = models_dir / "confidence_model.joblib"

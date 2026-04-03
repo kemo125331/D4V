@@ -1,39 +1,31 @@
-"""Tests for enhanced color mask and damage classifier."""
+"""Tests for enhanced color mask.
+
+Note: damage_classifier tests removed as module was deprecated.
+"""
 
 import sys
 from pathlib import Path
 
 import pytest
 
-# Import directly to avoid cv2 dependency
+# Import from experimental module
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-# Import enhanced color mask
+# Import enhanced color mask from experimental
 import importlib.util
 spec_color = importlib.util.spec_from_file_location(
-    "d4v.vision.enhanced_color_mask",
-    src_path / "d4v" / "vision" / "enhanced_color_mask.py"
+    "d4v.experimental.enhanced_color_mask",
+    src_path / "d4v" / "experimental" / "enhanced_color_mask.py"
 )
 enhanced_color = importlib.util.module_from_spec(spec_color)
-sys.modules["d4v.vision.enhanced_color_mask"] = enhanced_color
+sys.modules["d4v.experimental.enhanced_color_mask"] = enhanced_color
 spec_color.loader.exec_module(enhanced_color)
 
-# Import damage classifier  
-spec_classifier = importlib.util.spec_from_file_location(
-    "d4v.vision.damage_classifier",
-    src_path / "d4v" / "vision" / "damage_classifier.py"
-)
-damage_classifier = importlib.util.module_from_spec(spec_classifier)
-sys.modules["d4v.vision.damage_classifier"] = damage_classifier
-spec_classifier.loader.exec_module(damage_classifier)
-
 DamageColor = enhanced_color.DamageColor
-DamageType = damage_classifier.DamageType
 ColorRange = enhanced_color.ColorRange
 EnhancedColorMask = enhanced_color.EnhancedColorMask
-DamageTypeClassifier = damage_classifier.DamageTypeClassifier
-ClassifiedDamage = damage_classifier.ClassifiedDamage
+build_enhanced_combat_text_mask = enhanced_color.build_enhanced_combat_text_mask
 
 
 class TestDamageColor:

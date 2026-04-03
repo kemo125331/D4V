@@ -27,7 +27,7 @@ This guide shows you how to train a **custom ML model** on YOUR specific gamepla
 ### Step 1: Collect Your Data (5-10 minutes)
 
 **Run the collector:**
-```bash
+```powershell
 python scripts/collect_training_data.py
 ```
 
@@ -53,7 +53,7 @@ python scripts/collect_training_data.py
 ### Step 2: Train Custom Model (2-5 minutes)
 
 **Run training:**
-```bash
+```powershell
 python scripts/train_custom_model.py
 ```
 
@@ -107,13 +107,13 @@ Test F1 Score: 0.9912
 ### Step 3: Deploy Custom Model
 
 **Copy custom model to active:**
-```bash
+```powershell
 copy models\confidence_model_custom.joblib models\confidence_model.joblib
 ```
 
 **Restart live preview:**
-```bash
-run_live.bat
+```powershell
+uv run d4v-desktop
 ```
 
 **Your custom model is now active!**
@@ -273,7 +273,7 @@ copy models\confidence_model_custom.joblib models\confidence_model.joblib
 ```
 
 **Test in game:**
-- Run `run_live.bat`
+- Run `uv run d4v-desktop`
 - Play for 5-10 minutes
 - Check detection accuracy
 
@@ -310,7 +310,7 @@ python scripts/train_custom_model.py
 copy models\confidence_model_custom.joblib models\confidence_model.joblib
 
 # 4. Test
-run_live.bat
+uv run d4v-desktop
 ```
 
 ### Expected Results

@@ -5,17 +5,17 @@ from pathlib import Path
 
 import pytest
 
-# Import directly to avoid cv2 dependency
+# Import from experimental module
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 import importlib.util
 spec = importlib.util.spec_from_file_location(
-    "d4v.domain.kill_inference",
-    src_path / "d4v" / "domain" / "kill_inference.py"
+    "d4v.experimental.kill_inference",
+    src_path / "d4v" / "experimental" / "kill_inference.py"
 )
 kill_inference = importlib.util.module_from_spec(spec)
-sys.modules["d4v.domain.kill_inference"] = kill_inference
+sys.modules["d4v.experimental.kill_inference"] = kill_inference
 spec.loader.exec_module(kill_inference)
 
 KillTracker = kill_inference.KillTracker

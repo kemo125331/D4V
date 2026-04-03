@@ -8,7 +8,7 @@ from __future__ import annotations
 import concurrent.futures
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Callable, Protocol, runtime_checkable
 
 import PIL.ImageOps
 from PIL import Image
@@ -24,6 +24,7 @@ from d4v.vision.grouping import GroupedCandidate, group_bounding_boxes
 from d4v.vision.ocr import ocr_pil_image
 from d4v.vision.segments import segment_damage_tokens
 from d4v.vision.confidence_model import ConfidenceClassifier, ConfidenceFeatures
+from d4v.runtime_paths import bundled_models_dir
 
 # Persistent thread pool — created once at import time, reused every frame.
 # Avoids the ~15ms ThreadPoolExecutor setup cost per process_image call.
@@ -122,12 +123,7 @@ class CombatTextPipeline:
 
         # Initialize ML confidence classifier
         if model_path is None:
-            # Use default model location
-            model_path = (
-                Path(__file__).resolve().parents[3]
-                / "models"
-                / "confidence_model.joblib"
-            )
+            model_path = bundled_models_dir() / "confidence_model.joblib"
 
         self.confidence_classifier = ConfidenceClassifier(
             model_path=Path(model_path),
@@ -290,7 +286,7 @@ class CombatTextPipeline:
         self,
         target_group: GroupedCandidate,
         grouped_candidates: list[GroupedCandidate],
-        read_group_text: callable,
+        read_group_text: Callable[[GroupedCandidate], str],
     ) -> str | None:
         """Find adjacent suffix token (K, M, B) near the target group."""
         best_hint: str | None = None
@@ -331,39 +327,63 @@ class CombatTextPipeline:
         return best_hint
 
     def _is_ocr_ready_line(self, grouped: GroupedCandidate) -> bool:
-        """Check if a grouped candidate is ready for OCR."""
+        """Check if a grouped candidate is ready for OCR.
+        
+        Thresholds tuned to minimize OCR calls (each ~320ms) while catching
+        valid damage numbers.
+        """
         return (
-            self._score_line_candidate(grouped) >= 5.0  # tight: each OCR call = 320ms
-            and 12 <= grouped.width <= 380
-            and 10 <= grouped.height <= 130
+            self._score_line_candidate(grouped) >= 5.0  # Minimum score threshold
+            and 12 <= grouped.width <= 380  # Min/max width at 1080p
+            and 10 <= grouped.height <= 130  # Min/max height at 1080p
             and grouped.member_count >= 1
         )
 
     def _score_line_candidate(self, grouped: GroupedCandidate) -> float:
-        """Score a line candidate for OCR readiness."""
+        """Score a line candidate for OCR readiness.
+        
+        Scoring system based on damage number characteristics at 1080p resolution
+        after downscaling to 1280px max width.
+        
+        Positive scores (OCR-ready characteristics):
+        - Width 24-260px: Typical damage number width range
+        - Height 12-150px: Typical damage number height range
+        - Aspect ratio 1.5-5.0: Horizontal text orientation
+        - Member count 2-6: Multiple connected components (good segmentation)
+        - Fill ratio 0.15-0.7: Appropriate text density
+        
+        Negative scores (likely false positives):
+        - Single component: Likely noise or UI element
+        - Width >280px: Too wide, likely UI element
+        - Height >160px: Too tall, likely UI element
+        - Fill ratio >0.75: Too dense, likely solid UI block
+        """
         area = max(grouped.width * grouped.height, 1)
         fill_ratio = grouped.pixel_count / area
         aspect_ratio = grouped.width / max(grouped.height, 1)
 
         score = 0.0
-        if 24 <= grouped.width <= 260:
+        
+        # Positive scores (OCR-ready characteristics)
+        if 24 <= grouped.width <= 260:  # Typical damage number width
             score += 3.0
-        if 12 <= grouped.height <= 150:
+        if 12 <= grouped.height <= 150:  # Typical damage number height
             score += 3.0
-        if 1.5 <= aspect_ratio <= 5.0:
+        if 1.5 <= aspect_ratio <= 5.0:  # Horizontal text orientation
             score += 2.0
-        if 2 <= grouped.member_count <= 6:
+        if 2 <= grouped.member_count <= 6:  # Good segmentation
             score += 2.0
-        if 0.15 <= fill_ratio <= 0.7:
+        if 0.15 <= fill_ratio <= 0.7:  # Appropriate text density
             score += 2.0
 
-        if grouped.member_count == 1:
+        # Negative scores (likely false positives)
+        if grouped.member_count == 1:  # Single component = likely noise
             score -= 3.0
-        if grouped.width > 280:
+        if grouped.width > 280:  # Too wide = UI element
             score -= 2.5
-        if grouped.height > 160:
+        if grouped.height > 160:  # Too tall = UI element
             score -= 2.5
-        if fill_ratio > 0.75:
+        if fill_ratio > 0.75:  # Too dense = solid block
             score -= 2.0
 
         return score
@@ -406,3 +426,259 @@ class CombatTextPipeline:
         prediction = self.confidence_classifier.predict(features)
 
         return prediction.confidence
+
+
+# =============================================================================
+# Multi-Frame Voting Extension (Optional)
+# =============================================================================
+# Integrates OCR voting across frames for improved accuracy.
+# Disabled by default - import from d4v.experimental for full features.
+# =============================================================================
+
+
+@dataclass(frozen=True)
+class VotingDetectedHit(DetectedHit):
+    """Detected hit with multi-frame voting information.
+
+    Extends DetectedHit with voting metadata.
+
+    Attributes:
+        vote_count: Number of frames that agreed on this hit.
+        total_votes: Total frames where this hit was tracked.
+        agreement_ratio: Ratio of agreeing votes (0.0-1.0).
+    """
+
+    vote_count: int = 1
+    total_votes: int = 1
+    agreement_ratio: float = 1.0
+
+
+class CombatTextPipelineWithVoting:
+    """Combat text pipeline with multi-frame OCR voting.
+
+    Wraps CombatTextPipeline to add voting-based accuracy improvements.
+    Tracks damage numbers across multiple frames and uses weighted voting
+    to determine the most likely value.
+
+    Example:
+        pipeline = CombatTextPipelineWithVoting(
+            base_pipeline=pipeline,
+            spatial_threshold=70.0,      # Pixel distance for grouping
+            frame_window=5,              # Frames to track
+            min_votes=2,                 # Minimum votes for confidence boost
+        )
+
+        hits = pipeline.process_image(image, frame_index=100, timestamp_ms=3333)
+    """
+
+    def __init__(
+        self,
+        base_pipeline: CombatTextPipeline,
+        spatial_threshold: float = 70.0,
+        frame_window: int = 5,
+        min_votes: int = 2,
+        value_tolerance: float = 0.05,
+        confidence_boost: float = 0.15,
+    ) -> None:
+        """Initialize voting pipeline.
+
+        Args:
+            base_pipeline: Base CombatTextPipeline to wrap.
+            spatial_threshold: Max pixel distance for vote grouping.
+            frame_window: Max frame span for vote grouping.
+            min_votes: Minimum votes for confidence boost.
+            value_tolerance: Value matching tolerance (fraction).
+            confidence_boost: Confidence boost for multi-frame hits.
+        """
+        self.base_pipeline = base_pipeline
+        self.spatial_threshold = spatial_threshold
+        self.frame_window = frame_window
+        self.min_votes = min_votes
+        self.value_tolerance = value_tolerance
+        self.confidence_boost = confidence_boost
+
+        # Vote tracking
+        self._votes: list[dict] = []
+        self._tracks: dict[int, list[dict]] = {}
+        self._next_track_id = 1
+
+    def process_image(
+        self,
+        image: Image.Image,
+        frame_index: int,
+        timestamp_ms: int,
+    ) -> list[VotingDetectedHit]:
+        """Process image with multi-frame voting.
+
+        Args:
+            image: Input image.
+            frame_index: Frame index.
+            timestamp_ms: Timestamp in milliseconds.
+
+        Returns:
+            List of VotingDetectedHit with voting metadata.
+        """
+        # Get base detections
+        base_hits = self.base_pipeline.process_image(
+            image=image,
+            frame_index=frame_index,
+            timestamp_ms=timestamp_ms,
+        )
+
+        # Convert to vote format
+        for hit in base_hits:
+            vote = {
+                "frame_index": frame_index,
+                "parsed_value": hit.parsed_value,
+                "confidence": hit.confidence,
+                "center_x": hit.center_x,
+                "center_y": hit.center_y,
+                "raw_text": hit.sample_text,
+            }
+            self._add_vote(vote)
+
+        # Aggregate votes and apply confidence boosts
+        return self._apply_voting(frame_index)
+
+    def _add_vote(self, vote: dict) -> None:
+        """Add a vote and try to assign to existing track.
+
+        Args:
+            vote: Vote dictionary.
+        """
+        self._votes.append(vote)
+
+        # Find matching track
+        track_id = self._find_matching_track(vote)
+
+        if track_id is None:
+            # Create new track
+            track_id = self._next_track_id
+            self._next_track_id += 1
+            self._tracks[track_id] = []
+
+        self._tracks[track_id].append(vote)
+
+    def _find_matching_track(self, vote: dict) -> int | None:
+        """Find existing track matching this vote.
+
+        Args:
+            vote: Vote to match.
+
+        Returns:
+            Track ID or None.
+        """
+        for track_id, track_votes in self._tracks.items():
+            if not track_votes:
+                continue
+
+            last_vote = track_votes[-1]
+
+            # Check frame window
+            if vote["frame_index"] - last_vote["frame_index"] > self.frame_window:
+                continue
+
+            # Check spatial proximity
+            dx = vote["center_x"] - last_vote["center_x"]
+            dy = vote["center_y"] - last_vote["center_y"]
+            distance = (dx ** 2 + dy ** 2) ** 0.5
+
+            if distance > self.spatial_threshold:
+                continue
+
+            # Check value similarity
+            if last_vote["parsed_value"] > 0:
+                value_diff = abs(
+                    vote["parsed_value"] - last_vote["parsed_value"]
+                ) / last_vote["parsed_value"]
+                if value_diff > self.value_tolerance:
+                    continue
+
+            return track_id
+
+        return None
+
+    def _apply_voting(
+        self,
+        current_frame: int,
+    ) -> list[VotingDetectedHit]:
+        """Apply voting to current frame detections.
+
+        Args:
+            current_frame: Current frame index.
+
+        Returns:
+            List of VotingDetectedHit with boosted confidence.
+        """
+        hits: list[VotingDetectedHit] = []
+
+        # Process active tracks
+        for track_id, track_votes in self._tracks.items():
+            # Filter to recent votes
+            recent_votes = [
+                v
+                for v in track_votes
+                if current_frame - v["frame_index"] <= self.frame_window
+            ]
+
+            if not recent_votes:
+                continue
+
+            # Get best vote (highest confidence)
+            best_vote = max(recent_votes, key=lambda v: v["confidence"])
+
+            # Calculate voting metrics
+            vote_count = len(recent_votes)
+            total_votes = len(track_votes)
+            agreement_ratio = vote_count / max(total_votes, 1)
+
+            # Apply confidence boost for multi-frame confirmation
+            base_confidence = best_vote["confidence"]
+            if vote_count >= self.min_votes:
+                boosted_confidence = min(
+                    base_confidence + self.confidence_boost, 1.0
+                )
+            else:
+                boosted_confidence = base_confidence
+
+            hits.append(
+                VotingDetectedHit(
+                    frame_index=best_vote["frame_index"],
+                    timestamp_ms=best_vote.get("timestamp_ms"),
+                    parsed_value=best_vote["parsed_value"],
+                    confidence=boosted_confidence,
+                    sample_text=best_vote["raw_text"],
+                    center_x=best_vote["center_x"],
+                    center_y=best_vote["center_y"],
+                    vote_count=vote_count,
+                    total_votes=total_votes,
+                    agreement_ratio=agreement_ratio,
+                )
+            )
+
+        # Prune old tracks
+        self._prune_old_tracks(current_frame)
+
+        return hits
+
+    def _prune_old_tracks(self, current_frame: int, max_age: int = 10) -> None:
+        """Remove tracks that haven't been updated recently.
+
+        Args:
+            current_frame: Current frame index.
+            max_age: Maximum frames since last update.
+        """
+        to_remove = [
+            track_id
+            for track_id, track_votes in self._tracks.items()
+            if current_frame - track_votes[-1]["frame_index"] > max_age
+        ]
+
+        for track_id in to_remove:
+            del self._tracks[track_id]
+
+    def reset(self) -> None:
+        """Reset voting state."""
+        self._votes.clear()
+        self._tracks.clear()
+        self._next_track_id = 1

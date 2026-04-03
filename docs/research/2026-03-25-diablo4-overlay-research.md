@@ -202,7 +202,7 @@ Mitigation:
 Mitigation:
 - keep the MVP strictly out-of-process
 - avoid memory inspection and game modification
-- document the boundary clearly in `agent.md`
+- document the boundary clearly in `docs/README.md`
 
 ## Source Links
 

@@ -5,19 +5,17 @@ from pathlib import Path
 
 import pytest
 
-# Import directly from module file to avoid cv2 dependency in vision/__init__.py
-# Add src to path
+# Import from experimental module
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
-# Import the module directly without going through package __init__
 import importlib.util
 spec = importlib.util.spec_from_file_location(
-    "d4v.vision.ocr_voting",
-    src_path / "d4v" / "vision" / "ocr_voting.py"
+    "d4v.experimental.ocr_voting",
+    src_path / "d4v" / "experimental" / "ocr_voting.py"
 )
 ocr_voting = importlib.util.module_from_spec(spec)
-sys.modules["d4v.vision.ocr_voting"] = ocr_voting
+sys.modules["d4v.experimental.ocr_voting"] = ocr_voting
 spec.loader.exec_module(ocr_voting)
 
 OcrVote = ocr_voting.OcrVote

@@ -47,6 +47,10 @@ class TestOverlayConfigDefaults:
         config = OverlayConfig()
         assert config.separator_color == "#333333"
 
+    def test_default_mode(self):
+        config = OverlayConfig()
+        assert config.mode == "expanded"
+
 
 class TestOverlayConfigCustomValues:
     def test_custom_values_stored(self):
@@ -61,6 +65,7 @@ class TestOverlayConfigCustomValues:
             title_color="#aaaaaa",
             label_color="#bbbbbb",
             separator_color="#cccccc",
+            mode="compact",
         )
         assert config.opacity == 0.5
         assert config.font_size == 20
@@ -72,6 +77,7 @@ class TestOverlayConfigCustomValues:
         assert config.title_color == "#aaaaaa"
         assert config.label_color == "#bbbbbb"
         assert config.separator_color == "#cccccc"
+        assert config.mode == "compact"
 
 
 class TestSaveOverlayConfig:
@@ -106,6 +112,7 @@ class TestLoadOverlayConfig:
             "title_color": "#999999",
             "label_color": "#777777",
             "separator_color": "#444444",
+            "mode": "compact",
         }
         path = tmp_path / "config.json"
         path.write_text(json.dumps(data))
@@ -120,6 +127,7 @@ class TestLoadOverlayConfig:
         assert config.title_color == "#999999"
         assert config.label_color == "#777777"
         assert config.separator_color == "#444444"
+        assert config.mode == "compact"
 
 
 class TestSaveLoadRoundTrip:
@@ -135,6 +143,7 @@ class TestSaveLoadRoundTrip:
             title_color="#111111",
             label_color="#222222",
             separator_color="#333333",
+            mode="compact",
         )
         path = tmp_path / "config.json"
         save_overlay_config(original, path)
@@ -149,6 +158,7 @@ class TestSaveLoadRoundTrip:
         assert loaded.title_color == original.title_color
         assert loaded.label_color == original.label_color
         assert loaded.separator_color == original.separator_color
+        assert loaded.mode == original.mode
 
     def test_round_trip_with_none_position(self, tmp_path: Path):
         original = OverlayConfig(position=None)
@@ -167,6 +177,14 @@ class TestMissingConfigFile:
     def test_load_returns_defaults_for_nonexistent_default_path(self):
         config = load_overlay_config()
         assert config == OverlayConfig()
+
+    def test_default_path_uses_appdata(self, monkeypatch, tmp_path: Path):
+        monkeypatch.setenv("APPDATA", str(tmp_path))
+        config = OverlayConfig(opacity=0.5)
+        save_overlay_config(config)
+        loaded = load_overlay_config()
+        assert loaded.opacity == 0.5
+        assert (tmp_path / "D4V" / "overlay_config.json").exists()
 
 
 class TestCorruptConfigFile:

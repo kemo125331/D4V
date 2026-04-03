@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
+
+from d4v.ui.paths import app_data_dir
 
 
 @dataclass
@@ -22,6 +24,7 @@ class OverlayConfig:
         title_color: Color for the title text.
         label_color: Color for stat labels.
         separator_color: Color for separator lines.
+        mode: Overlay density preset.
     """
 
     opacity: float = 0.85
@@ -34,6 +37,7 @@ class OverlayConfig:
     title_color: str = "#888888"
     label_color: str = "#666666"
     separator_color: str = "#333333"
+    mode: str = "expanded"
 
 
 def load_overlay_config(path: Path | None = None) -> OverlayConfig:
@@ -46,7 +50,7 @@ def load_overlay_config(path: Path | None = None) -> OverlayConfig:
         Loaded OverlayConfig with defaults for missing values.
     """
     if path is None:
-        path = Path(__file__).parent / "overlay_config.json"
+        path = app_data_dir() / "overlay_config.json"
 
     if not path.exists():
         return OverlayConfig()
@@ -69,7 +73,7 @@ def save_overlay_config(config: OverlayConfig, path: Path | None = None) -> None
         path: Path to config file. Defaults to overlay_config.json in package dir.
     """
     if path is None:
-        path = Path(__file__).parent / "overlay_config.json"
+        path = app_data_dir() / "overlay_config.json"
 
     data = asdict(config)
     path.parent.mkdir(parents=True, exist_ok=True)

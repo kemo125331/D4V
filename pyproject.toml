@@ -13,15 +13,20 @@ dependencies = [
     "pillow>=11.3.0",
     "opencv-python>=4.10.0",
     "numpy>=1.26.0",
+    "PySide6>=6.8.0",
     "winocr>=0.0.15; sys_platform == 'win32'",
 ]
 
 [project.scripts]
 d4v = "d4v.app:main"
+d4v-desktop = "d4v.desktop:main"
 
 [dependency-groups]
 dev = [
     "pytest>=8.4.0",
+]
+build = [
+    "pyinstaller>=6.16.0",
 ]
 
 [tool.hatch.build.targets.wheel]

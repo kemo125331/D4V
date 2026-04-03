@@ -5,7 +5,7 @@
 [![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-D4V is an out-of-process Diablo IV combat tracker built around screen capture, OCR, and replay-first validation. It watches floating combat text, turns values like `246K` or `10.3M` into numbers, and shows rolling combat stats in a live preview window or transparent overlay.
+D4V is an out-of-process Diablo IV combat tracker built around screen capture, OCR, and replay-first validation. It watches floating combat text, turns values like `246K` or `10.3M` into numbers, and shows rolling combat stats in a Qt desktop shell or transparent overlay.
 
 ## Current Implementation
 
@@ -14,15 +14,15 @@ D4V is an out-of-process Diablo IV combat tracker built around screen capture, O
 - Screen capture is bound to the Diablo IV window ROI
 - Live capture pauses when Diablo IV is not the foreground window
 - Replay analysis and live preview share the same vision pipeline
-- Transparent overlay exists and can run with the live preview
+- Transparent Qt overlay exists and can run with the live preview
 - ML confidence scoring is used to filter OCR candidates
 
 ## What Works Today
 
 - replay capture for later analysis
 - offline replay OCR analysis
-- live preview window with recent hits and session stats
-- transparent Tk overlay with click-through support
+- Qt desktop shell with compact session stats
+- transparent Qt overlay with click-through support
 - persisted overlay settings and saved overlay position
 - OpenCV-based masking, grouping, and candidate extraction
 - damage parsing with `K`, `M`, `B`, and `T` display formatting
@@ -54,6 +54,12 @@ No separate Tesseract or PaddleOCR install is required. WinOCR is provided by Wi
 
 ## Main Commands
 
+### Desktop App
+
+```powershell
+uv run d4v-desktop
+```
+
 ### Live Preview
 
 ```powershell
@@ -69,13 +75,13 @@ uv run d4v live-preview --with-overlay
 ### Replay Preview
 
 ```powershell
-uv run d4v live-preview --replay fixtures/replays/<session-name>
+uv run d4v live-preview --replay %APPDATA%\D4V\replays\<session-name>
 ```
 
 ### Replay OCR Analysis
 
 ```powershell
-uv run d4v analyze-replay-ocr fixtures/replays/<session-name>
+uv run d4v analyze-replay-ocr %APPDATA%\D4V\replays\<session-name>
 ```
 
 ### Capture A Session
@@ -92,10 +98,23 @@ uv run d4v game-overlay
 
 ## Runtime Notes
 
-- `run_live.bat` starts the live preview with the overlay
+- `d4v-desktop` is the normal-user launch path
 - `capture_game_window_image()` defaults to `require_foreground=True`
 - when Diablo IV is not focused, live capture pauses instead of reading desktop content
 - if WinOCR is unavailable, OCR currently returns an empty result instead of falling back to another engine
+- live captures and recorded replay sessions are stored under `%APPDATA%\D4V\replays`
+
+## Windows Build
+
+For a normal-user standalone `.exe`, build on Windows with:
+
+```powershell
+./scripts/build_windows.ps1
+```
+
+This produces `dist/D4V.exe`, a double-clickable desktop build that launches the Qt desktop shell with overlay support.
+
+GitHub Actions also builds the Windows executable in `.github/workflows/build-windows.yml` and uploads `D4V-windows-x64.zip` as a workflow artifact.
 
 ## Project Structure
 
@@ -104,7 +123,8 @@ src/d4v/
 ├── app.py                  # CLI entry point
 ├── capture/                # window detection, screen capture, recording
 ├── domain/                 # combat/session models and aggregation
-├── overlay/                # preview UI, overlay window, overlay config
+├── overlay/                # overlay config and shared overlay view models
+├── ui/                     # Qt shell, capture assistant, live overlay runtime
 ├── tools/                  # live preview and replay analysis commands
 └── vision/                 # masking, grouping, OCR, ML scoring
 ```

@@ -1,0 +1,53 @@
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Sync dependencies
+        run: uv sync --dev --group build
+
+      - name: Verify tests
+        run: uv run pytest -q tests/ui tests/overlay tests/tools/test_capture_round.py tests/test_smoke.py
+
+      - name: Verify test collection
+        run: uv run pytest --collect-only -q
+
+      - name: Build standalone executable
+        shell: pwsh
+        run: .\scripts\build_windows.ps1
+
+      - name: Package artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          Copy-Item dist\D4V.exe artifact\D4V.exe
+          Copy-Item README.md artifact\README.md
+          Compress-Archive -Path artifact\* -DestinationPath D4V-windows-x64.zip -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: D4V-windows-x64
+          path: D4V-windows-x64.zip

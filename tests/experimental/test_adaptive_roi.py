@@ -5,17 +5,17 @@ from pathlib import Path
 
 import pytest
 
-# Import directly from module file to avoid cv2 dependency
+# Import from experimental module
 src_path = Path(__file__).parent.parent.parent / "src"
 sys.path.insert(0, str(src_path))
 
 import importlib.util
 spec = importlib.util.spec_from_file_location(
-    "d4v.vision.adaptive_roi",
-    src_path / "d4v" / "vision" / "adaptive_roi.py"
+    "d4v.experimental.adaptive_roi",
+    src_path / "d4v" / "experimental" / "adaptive_roi.py"
 )
 adaptive_roi = importlib.util.module_from_spec(spec)
-sys.modules["d4v.vision.adaptive_roi"] = adaptive_roi
+sys.modules["d4v.experimental.adaptive_roi"] = adaptive_roi
 spec.loader.exec_module(adaptive_roi)
 
 AdaptiveRoiTracker = adaptive_roi.AdaptiveRoiTracker
